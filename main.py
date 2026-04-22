@@ -17,6 +17,10 @@ from dotenv import load_dotenv
 # Añade mie al path
 sys.path.insert(0, str(Path(__file__).parent))
 
+# Setup: generar .env desde variables de sistema (para Railway)
+from setup_env import setup_env_file
+setup_env_file()
+
 from validate_env import validate_env
 from mie.orchestrator import MIEOrchestrator
 
