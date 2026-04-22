@@ -41,6 +41,7 @@ from mie.event_bus import EventBusManager
 from mie.config_manager import ConfigManager
 from mie.api_server import APIServer
 from mie.execution_engine import ExecutionEngine
+from mie.scheduler import MIEScheduler
 from mie.dialogue import DialogueHandler
 
 
@@ -108,6 +109,9 @@ class MIEOrchestrator:
         
         # Core execution engine
         self.execution = ExecutionEngine(self)
+        
+        # Scheduler for periodic execution
+        self.scheduler = MIEScheduler(self, logger=self.logger)
 
         # Assets a observar (V1)
         self.assets = ["BTC", "ETH"]
