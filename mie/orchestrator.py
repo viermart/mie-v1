@@ -348,35 +348,28 @@ class MIEOrchestrator:
     def _handle_debug_command(self, text: str, user_id: str) -> str:
         """
         Maneja comandos /debug directamente sin pasar por intent_parser.
-        Soporta: /debug, /debug btc, /debug eth, /debug all, /debug status
+        Parsing simple y directo.
         """
         try:
-            parts = text.split()
-            asset = None
+            # Normalizar: strip, lowercase, remover / inicial
+            clean = text.strip().lower()
+            if clean.startswith("/"):
+                clean = clean[1:]
             
-            if len(parts) > 1:
-                asset = parts[1].upper()  # btc -> BTC
+            # Split por espacios
+            parts = clean.split()
+            cmd = parts[0] if len(parts) > 0 else ""
+            arg = parts[1].lower() if len(parts) > 1 else "status"
             
-            self.logger.info(f"🔧 Debug command: {text} (asset={asset})")
+            # Log del parsing
+            self.logger.info(f"🔧 Debug raw text: '{text}'")
+            self.logger.info(f"🔧 Debug parts: {parts}")
+            self.logger.info(f"🔧 Debug arg: '{arg}'")
             
-            # Llama a DebugService
-            from mie.debug_service import DebugService
-            debug_service = DebugService(self.db, self.binance, self.logger)
-            
-            if asset == "BTC":
-                result = debug_service.test_binance_fetch("BTCUSDT")
-            elif asset == "ETH":
-                result = debug_service.test_binance_fetch("ETHUSDT")
-            elif asset == "ALL":
-                result = debug_service.full_diagnostic()
-            elif asset == "STATUS":
-                result = f"✅ MIE V1 running\nAssets: {self.assets}\nDB: {self.db_path}"
-            else:
-                # /debug sin argumentos
-                result = "Debug commands:\n/debug btc - Test BTC fetch\n/debug eth - Test ETH fetch\n/debug all - Full diagnostic\n/debug status - Service status"
-            
-            return result
+            # Respuesta temporal para verificar parsing
+            return f"DEBUG ARG = {arg}"
             
         except Exception as e:
             self.logger.error(f"Error in debug command: {e}")
             return f"❌ Debug error: {str(e)}"
+
