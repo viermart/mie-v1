@@ -339,3 +339,20 @@ class MIEDatabase:
             ''', (lookback_hours,))
         result = cursor.fetchone()
         return result[0] if result else 0
+
+    def count_dialogue_entries(self, lookback_hours: int = 24) -> int:
+        """Count dialogue entries in lookback window."""
+        cursor = self.conn.cursor()
+        since = (datetime.utcnow() - timedelta(hours=lookback_hours)).isoformat()
+        cursor.execute("SELECT COUNT(*) as count FROM dialogue_memory WHERE timestamp > ?", (since,))
+        row = cursor.fetchone()
+        return row["count"] if row else 0
+
+    def count_feedback_entries(self, lookback_hours: int = 24) -> int:
+        """Count user feedback entries in lookback window."""
+        cursor = self.conn.cursor()
+        since = (datetime.utcnow() - timedelta(hours=lookback_hours)).isoformat()
+        cursor.execute("SELECT COUNT(*) as count FROM user_feedback WHERE timestamp > ?", (since,))
+        row = cursor.fetchone()
+        return row["count"] if row else 0
+

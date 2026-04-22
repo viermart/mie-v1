@@ -204,82 +204,95 @@ class MIEOrchestrator:
             self.reporter.send_error(f"Fast loop error: {e}")
 
     def daily_loop(self):
-        """Ejecuta a las 08:00 UTC: reflexión + investigación"""
+        """Ejecuta a las 08:00 UTC: reflexion + investigacion + research layer"""
         try:
             self.logger.info("\n🔄 DAILY LOOP iniciando...")
-
-            # Reflexión: resume observaciones de 24h
             summary = self._reflect_on_observations(lookback_hours=24)
-            self.logger.info(f"📊 Resumen 24h: {summary}")
-
-            # Research: ejecuta experimentos pendientes
+            new_hyps = self.research.generate_micro_hypotheses()
+            self.logger.info(f"Generated {len(new_hyps)} micro-hypotheses")
+            
+            registry = self.research._load_hypothesis_registry()
             active_hyps = self.db.get_active_hypotheses()
-            self.logger.info(f"🔬 Hipótesis activas: {len(active_hyps)}")
-
-            for hyp in active_hyps:
-                if hyp["status"] == "testing":
-                    result = self.research.run_experiment(hyp["hypothesis_id"])
-                    self.logger.info(f"📈 Experimento para {hyp['hypothesis_id']}: {result}")
-
-            # Learning log
+            
             self.db.add_learning_log(
                 log_type="daily",
                 content=json.dumps({
                     "timestamp": datetime.utcnow().isoformat(),
-                    "observation_summary": summary,
-                    "active_hypotheses": len(active_hyps)
+                    "summary": summary,
+                    "new_hypotheses": len(new_hyps),
+                    "active": len(active_hyps)
                 })
             )
-
-            # Reportea
+            
             self.reporter.send_daily_report(summary, active_hyps)
-
             self.logger.info("✅ DAILY LOOP completado\n")
             self.last_daily = datetime.utcnow()
 
         except Exception as e:
-            self.logger.error(f"DAILY LOOP error: {e}")
+            self.logger.error(f"DAILY LOOP error: {e}", exc_info=True)
             self.reporter.send_error(f"Daily loop error: {e}")
 
     def weekly_loop(self):
-        """Ejecuta domingo: meta-thinking + hypothesis review"""
+        """Ejecuta domingo 20:00 UTC: research review + hypothesis management"""
         try:
             self.logger.info("\n🌙 WEEKLY LOOP iniciando...")
-
-            # Meta-reflexión sobre la semana
-            weekly_summary = self._reflect_on_observations(lookback_hours=24*7)
-            self.logger.info(f"📊 Resumen semanal: {weekly_summary}")
-
-            # Revisa todas las hipótesis
+            experiment_summary = self.research.get_experiment_summary()
+            self.logger.info(f"Experiments this week: {experiment_summary['this_week']}")
+            
+            registry = self.research._load_hypothesis_registry()
             all_hyps = self.db.get_active_hypotheses()
-
-            # Clasifica hipótesis que terminaron testing
+            demoted_count = 0
+            
             for hyp in all_hyps:
-                if hyp["status"] == "testing":
-                    # Aquí iría lógica de clasificación (falsified/weakly/supported/strongly)
-                    # Por ahora solo registra
-                    self.logger.info(f"📋 Hipótesis {hyp['hypothesis_id']} aún en testing")
-
-            # Learning log semanal
+                if hyp.get("confidence") == "falsified":
+                    self.research.finalize_hypothesis(hyp["hypothesis_id"], "falsified", "Success rate < 60%")
+                    demoted_count += 1
+            
             self.db.add_learning_log(
                 log_type="weekly",
                 content=json.dumps({
                     "timestamp": datetime.utcnow().isoformat(),
-                    "weekly_summary": weekly_summary,
-                    "total_hypotheses": len(all_hyps),
-                    "observations_7d": len(self.db.get_observations("BTC", lookback_hours=24*7))
+                    "active": len(all_hyps),
+                    "demoted": demoted_count
                 })
             )
-
-            # Reportea
+            
+            weekly_summary = self._reflect_on_observations(lookback_hours=24*7)
             self.reporter.send_weekly_report(weekly_summary, all_hyps)
-
             self.logger.info("✅ WEEKLY LOOP completado\n")
             self.last_weekly = datetime.utcnow()
 
         except Exception as e:
-            self.logger.error(f"WEEKLY LOOP error: {e}")
+            self.logger.error(f"WEEKLY LOOP error: {e}", exc_info=True)
             self.reporter.send_error(f"Weekly loop error: {e}")
+
+    def monthly_loop(self):
+        """Ejecuta 1st of month 18:00 UTC: research health check"""
+        try:
+            self.logger.info("\n📅 MONTHLY LOOP iniciando...")
+            registry = self.research._load_hypothesis_registry()
+            hypotheses_active = len(registry.get("active", []))
+            supported_count = sum(1 for h in registry.get("active", []) if h.get("confidence") in ["supported", "strongly_supported"])
+            
+            self.logger.info(f"Active: {hypotheses_active}, Supported: {supported_count}")
+            
+            self.db.add_learning_log(
+                log_type="monthly",
+                content=json.dumps({
+                    "timestamp": datetime.utcnow().isoformat(),
+                    "active": hypotheses_active,
+                    "supported": supported_count
+                })
+            )
+            
+            month_summary = self._reflect_on_observations(lookback_hours=24*30)
+            self.reporter.send_monthly_report(month_summary, self.db.get_active_hypotheses())
+            self.logger.info("✅ MONTHLY LOOP completado\n")
+            self.last_monthly = datetime.utcnow()
+
+        except Exception as e:
+            self.logger.error(f"MONTHLY LOOP error: {e}", exc_info=True)
+            self.reporter.send_error(f"Monthly loop error: {e}")
 
     def dialogue_loop(self):
         """Ejecuta constantemente: chequea y procesa mensajes de Telegram"""
