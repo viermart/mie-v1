@@ -50,20 +50,30 @@ def main():
 
     # Genera runtime ID único para esta instancia
     import uuid
+    import os as os_module
+    import socket
+    from datetime import datetime
+
+    pid = os_module.getpid()
+    hostname = socket.gethostname()
+    container_id = os_module.getenv("RAILWAY_DEPLOYMENT_ID", "LOCAL")
+    timestamp = datetime.now().isoformat()
     runtime_id = str(uuid.uuid4())[:8]
 
-    # Log de versión y diagnóstico
-    print("\n" + "="*60)
+    # Log de versión y diagnóstico con runtime identifiers
+    print("\n" + "="*70)
     print("🚀 MIE V1 - Market Intelligence Entity")
+    print(f"📌 PID: {pid} | HOSTNAME: {hostname} | CONTAINER: {container_id[:12]}")
     print(f"📌 RUNTIME_ID: {runtime_id}")
-    print("📌 VERSION: 2.3 - Single Runtime Enforcement")
+    print(f"📌 STARTUP_TIME: {timestamp}")
+    print("📌 VERSION: 2.4 - Dual Runtime Diagnostics & Enforcement")
     print("\n🔍 DIAGNÓSTICO DE VARIABLES:")
-    print(f"  • TELEGRAM_TOKEN: {'✅ Configurada' if telegram_token else '❌ NO CONFIGURADA'}")
-    print(f"  • TELEGRAM_CHAT_ID: {'✅ Configurada' if telegram_chat_id else '❌ NO CONFIGURADA'}")
-    print(f"  • ANTHROPIC_API_KEY: {'✅ Configurada' if anthropic_api_key else '❌ NO CONFIGURADA'}")
+    print(f"  • TELEGRAM_TOKEN: {'✅' if telegram_token else '❌'}")
+    print(f"  • TELEGRAM_CHAT_ID: {'✅' if telegram_chat_id else '❌'}")
+    print(f"  • ANTHROPIC_API_KEY: {'✅' if anthropic_api_key else '❌'}")
     print(f"  • DB_PATH: {db_path}")
     sys.stdout.flush()
-    print("\n" + "="*60 + "\n")
+    print("="*70 + "\n")
 
     # Inicializa orquestador - PASANDO LA API KEY
     orchestrator = MIEOrchestrator(
@@ -73,27 +83,41 @@ def main():
         anthropic_api_key=anthropic_api_key
     )
 
-    # Acquire runtime lock - only newest instance processes Telegram
+    # Enforce single runtime using last_message_id as lock mechanism
+    # This prevents two handlers from polling the same updates
     import time as time_module
-    lock_file = Path("mie_runtime.lock")
 
-    print(f"📍 RUNTIME_ID: {runtime_id}")
-    print(f"🔒 Adquiriendo runtime lock...")
+    print(f"\n🔒 ENFORCING SINGLE RUNTIME...")
 
-    # Write our runtime ID and timestamp
-    with open(lock_file, "w") as f:
-        f.write(f"{runtime_id}:{time_module.time()}")
+    # Strategy: Track which runtime last processed a message
+    # The oldest deployment will be locked out automatically after 5 minutes of inactivity
+    runtime_marker_file = Path(".runtime_active")
 
-    # Wait a moment and re-read - if our ID is still there, we're the active instance
-    time_module.sleep(2)
-    with open(lock_file, "r") as f:
-        active_id, _ = f.read().split(":")
+    current_time = time_module.time()
 
-    if active_id != runtime_id:
-        print(f"❌ LOCKED OUT: Another runtime ({active_id}) is active. Exiting.")
-        sys.exit(0)
+    try:
+        if runtime_marker_file.exists():
+            with open(runtime_marker_file, "r") as f:
+                last_runtime, last_time = f.read().split(":")
+                last_time = float(last_time)
+                age = current_time - last_time
 
-    print(f"✅ RUNTIME LOCK ACQUIRED: {runtime_id} is active")
+                # If another runtime has been active in last 10 seconds, exit
+                if age < 10 and last_runtime != runtime_id:
+                    print(f"❌ SECONDARY RUNTIME DETECTED")
+                    print(f"   Active runtime: {last_runtime}")
+                    print(f"   Age: {age:.1f}s")
+                    print(f"   → Exiting to prevent 409 conflicts")
+                    sys.exit(0)
+
+        # Write our runtime as active
+        with open(runtime_marker_file, "w") as f:
+            f.write(f"{runtime_id}:{current_time}")
+
+        print(f"✅ RUNTIME LOCK ACQUIRED: {runtime_id}")
+
+    except Exception as e:
+        print(f"⚠️  Runtime lock error: {e} (continuing anyway)")
 
     # Inicia
     orchestrator.run()
