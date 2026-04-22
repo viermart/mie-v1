@@ -25,22 +25,28 @@ def main():
     env_path = Path(__file__).parent / ".env"
     if env_path.exists():
         load_dotenv(env_path)
+        print("✅ Archivo .env cargado")
     else:
         print("⚠️  .env no encontrado - usando variables de entorno del sistema")
 
     # Obtiene configuración
     telegram_token = os.getenv("TELEGRAM_TOKEN")
     telegram_chat_id = os.getenv("TELEGRAM_CHAT_ID")
+    anthropic_api_key = os.getenv("ANTHROPIC_API_KEY")
     db_path = os.getenv("DB_PATH", "mie.db")
 
-    # Log de versión
+    # Log de versión y diagnóstico
     print("\n" + "="*60)
     print("🚀 MIE V1 - Market Intelligence Entity")
-    print("📌 MARKER: MIE_MARKER_2026_04_22_X1")
-    print("📌 VERSION: 2.1 - Debug System Enabled")
+    print("📌 MARKER: MIE_MARKER_2026_04_22_X2")
+    print("📌 VERSION: 2.2 - Railway Redeploy with Claude API")
+    print("\n🔍 DIAGNÓSTICO DE VARIABLES:")
+    print(f"  • TELEGRAM_TOKEN: {'✅ Configurada' if telegram_token else '❌ NO CONFIGURADA'}")
+    print(f"  • TELEGRAM_CHAT_ID: {'✅ Configurada' if telegram_chat_id else '❌ NO CONFIGURADA'}")
+    print(f"  • ANTHROPIC_API_KEY: {'✅ Configurada' if anthropic_api_key else '❌ NO CONFIGURADA'}")
+    print(f"  • DB_PATH: {db_path}")
     sys.stdout.flush()
-    print("   Available commands: /debug, /debug btc, /debug eth, /debug all")
-    print("="*60 + "\n")
+    print("\n" + "="*60 + "\n")
 
     # Inicializa orquestador
     orchestrator = MIEOrchestrator(
