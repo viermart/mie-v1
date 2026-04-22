@@ -43,36 +43,36 @@ class DebugService:
         self.logger.info(f"[{stage}] {asset}: {status} - {json.dumps(data)[:100]}")
 
     def test_binance_fetch(self, symbol: str = "BTCUSDT") -> str:
-        """Test market data fetch con inspección de raw response."""
+        """Test market data fetch con inspeccion de raw response."""
         try:
             result = self.binance.market_manager.get_ticker(symbol)
             
             lines = []
-            lines.append(f"🔍 **DEBUG: Market Data for {symbol}**")
+            lines.append(f"DEBUG: Market Data for {symbol}")
             lines.append("")
-            lines.append(f"**Provider:** {result.get('provider', 'unknown')}")
-            lines.append(f"**HTTP Code:** {result.get('http_code', 'N/A')}")
-            lines.append(f"**Status:** {result.get('status', 'N/A')}")
+            lines.append(f"Provider: {result.get('provider', 'unknown')}")
+            lines.append(f"HTTP Code: {result.get('http_code', 'N/A')}")
+            lines.append(f"Status: {result.get('status', 'N/A')}")
             lines.append("")
             
             if 'raw_response' in result and isinstance(result.get('raw_response'), dict):
                 raw = result['raw_response']
-                lines.append(f"**Raw Response Keys:** {list(raw.keys())}")
-                lines.append(f"**Raw Data (truncated):** {str(raw)[:500]}")
+                lines.append(f"Raw Response Keys: {list(raw.keys())}")
+                lines.append(f"Raw Data (truncated): {str(raw)[:500]}")
                 lines.append("")
             
-            lines.append(f"**Parsed Price:** {result.get('price', 'N/A')}")
-            lines.append(f"**Parsed Volume:** {result.get('volume_24h', 'N/A')}")
-            lines.append(f"**Parsed Change:** {result.get('change_24h', 'N/A')}")
+            lines.append(f"Parsed Price: {result.get('price', 'N/A')}")
+            lines.append(f"Parsed Volume: {result.get('volume_24h', 'N/A')}")
+            lines.append(f"Parsed Change: {result.get('change_24h', 'N/A')}")
             lines.append("")
             
             if result.get('http_code') != 200:
-                lines.append(f"⚠️  **HTTP Error:** {result.get('http_code')}")
+                lines.append(f"WARNING - HTTP Error: {result.get('http_code')}")
             
             return "\n".join(lines)
         
         except Exception as e:
-            return f"❌ **ERROR in test_binance_fetch:** {str(e)}"
+            return f"ERROR in test_binance_fetch: {str(e)}"
 
     def test_parsing(self, asset: str = "BTC") -> Dict:
         """
