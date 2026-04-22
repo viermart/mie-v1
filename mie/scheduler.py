@@ -293,29 +293,34 @@ class MIEScheduler:
         """Start the scheduler."""
         self.scheduler.running = True
         print("✅ MIE Scheduler started")
+        self.orchestrator.logger.info("✅ MIE Scheduler initialized - listening for Telegram messages")
 
-        # Counter para chequear mensajes cada N iteraciones (evita spam)
+        # Counter para chequear mensajes de Telegram frecuentemente
         telegram_check_counter = 0
-        telegram_check_interval = 10  # Chequea cada 10 segundos
+        telegram_check_interval = 3  # Chequea cada 3 segundos (más frecuente)
 
         while self.scheduler.running:
             try:
+                # Ejecuta tareas programadas
                 self.scheduler.scheduler.run_pending()
 
-                # Chequea mensajes de Telegram cada N iteraciones
+                # Chequea mensajes de Telegram regularmente
                 telegram_check_counter += 1
                 if telegram_check_counter >= telegram_check_interval:
                     try:
+                        # Debug logging
+                        self.orchestrator.logger.debug("Checking Telegram messages...")
                         self.orchestrator._check_telegram_messages()
                     except Exception as e:
-                        self.orchestrator.logger.error(f"Error checking Telegram: {e}")
+                        self.orchestrator.logger.error(f"❌ Error checking Telegram: {e}", exc_info=True)
                     telegram_check_counter = 0
 
                 time.sleep(1)
             except KeyboardInterrupt:
+                self.orchestrator.logger.info("Scheduler stopped by user")
                 break
             except Exception as e:
-                print(f"❌ Scheduler error: {e}")
+                self.orchestrator.logger.error(f"❌ Scheduler error: {e}", exc_info=True)
                 time.sleep(5)
 
     def stop(self):

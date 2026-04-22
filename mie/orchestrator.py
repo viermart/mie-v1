@@ -48,12 +48,14 @@ from mie.dialogue import DialogueHandler
 class MIEOrchestrator:
     def __init__(self, db_path: str = "mie.db", telegram_token: str = None,
                  telegram_chat_id: str = None):
+        # Setup logger FIRST - used by all other components
+        self.logger = self._setup_logger()
+
         self.db = MIEDatabase(db_path)
         self.binance = BinanceClient()
         self.research = ResearchLayer(self.db)
         self.reporter = Reporter(telegram_token, telegram_chat_id)
-        self.dialogue = DialogueHandler(self.db, self._setup_logger())
-        self.logger = self._setup_logger()
+        self.dialogue = DialogueHandler(self.db, self.logger)
 
         # Telegram config
         self.telegram_token = telegram_token
@@ -147,7 +149,8 @@ class MIEOrchestrator:
     def _check_telegram_messages(self):
         """Verifica y procesa mensajes nuevos de Telegram"""
         if not self.telegram_token:
-            return  # Sin Telegram configurado
+            self.logger.debug("Telegram token no configurado, skipping message check")
+            return
 
         try:
             url = f"https://api.telegram.org/bot{self.telegram_token}/getUpdates"
@@ -162,66 +165,83 @@ class MIEOrchestrator:
                 return
 
             updates = data.get("result", [])
+            if updates:
+                self.logger.debug(f"Encontrados {len(updates)} nuevos updates de Telegram")
+
             for update in updates:
-                self.last_message_id = max(self.last_message_id, update["update_id"])
+                try:
+                    self.last_message_id = max(self.last_message_id, update["update_id"])
 
-                # Solo procesa mensajes de texto
-                if "message" in update and "text" in update["message"]:
-                    message = update["message"]
-                    user_id = str(message["from"]["id"])
-                    text = message["text"]
+                    # Solo procesa mensajes de texto
+                    if "message" in update and "text" in update["message"]:
+                        message = update["message"]
+                        user_id = str(message["from"]["id"])
+                        text = message["text"]
 
-                    self.logger.info(f"💬 Mensaje de {user_id}: {text}")
+                        self.logger.info(f"💬 Mensaje de {user_id}: {text}")
 
-                    # Intercepta comandos /debug
-                    if text.startswith("/debug"):
-                        response = self._handle_debug_command(text, user_id)
-                        # Debug messages sin markdown parsing
-                        self._send_telegram_message(response, use_markdown=False)
-                    else:
-                        # Procesa con DialogueHandler
-                        response = self.dialogue.handle_message(text, user_id)
-                        # Diálogo normal con markdown
-                        self._send_telegram_message(response, use_markdown=True)
+                        # Intercepta comandos /debug
+                        if text.startswith("/debug"):
+                            response = self._handle_debug_command(text, user_id)
+                            self.logger.debug(f"Debug response: {response}")
+                            self._send_telegram_message(response, use_markdown=False)
+                        else:
+                            # Procesa con DialogueHandler
+                            self.logger.debug(f"Procesando con DialogueHandler...")
+                            response = self.dialogue.handle_message(text, user_id)
+                            self.logger.debug(f"DialogueHandler response: {response}")
+                            # Diálogo normal con markdown
+                            self._send_telegram_message(response, use_markdown=True)
+                except Exception as e:
+                    self.logger.error(f"Error procesando update {update.get('update_id')}: {e}", exc_info=True)
 
         except requests.RequestException as e:
-            self.logger.error(f"Error checking Telegram messages: {e}")
+            self.logger.error(f"Error checking Telegram messages: {e}", exc_info=True)
         except Exception as e:
-            self.logger.error(f"Error processing Telegram message: {e}")
+            self.logger.error(f"Error en _check_telegram_messages: {e}", exc_info=True)
 
     def _send_telegram_message(self, text: str, use_markdown: bool = True):
         """Envía un mensaje a Telegram. Convierte dicts a string si es necesario."""
-        if not self.telegram_token or not self.telegram_chat_id:
-            self.logger.warning("Telegram no configurado, mensaje no enviado")
+        if not self.telegram_token:
+            self.logger.error("Telegram token no configurado")
+            return
+
+        if not self.telegram_chat_id:
+            self.logger.error("Telegram chat_id no configurado")
             return
 
         try:
             # Convierte dict a string si es necesario
             if isinstance(text, dict):
                 text = str(text)
-            
-            # Limita a 4096 chars (límite de Telegram)
+
+            # Convierte a string y limita a 4096 chars (límite de Telegram)
             text = str(text)[:4096]
-            
+
             url = f"https://api.telegram.org/bot{self.telegram_token}/sendMessage"
             params = {
                 "chat_id": self.telegram_chat_id,
                 "text": text,
             }
-            
+
             # Solo usa Markdown si está habilitado
             if use_markdown:
                 params["parse_mode"] = "Markdown"
 
+            self.logger.debug(f"Sending Telegram message to {self.telegram_chat_id}: {text[:50]}...")
             response = requests.post(url, params=params, timeout=10)
             response.raise_for_status()
 
-            self.logger.info("✅ Respuesta enviada a Telegram")
+            data = response.json()
+            if data.get("ok"):
+                self.logger.info(f"✅ Respuesta enviada a Telegram (message_id: {data['result'].get('message_id')})")
+            else:
+                self.logger.error(f"Telegram API error: {data.get('description')}")
 
         except requests.RequestException as e:
-            self.logger.error(f"Error sending Telegram message: {e}")
+            self.logger.error(f"Error sending Telegram message: {e}", exc_info=True)
         except Exception as e:
-            self.logger.error(f"Unexpected error sending message: {e}")
+            self.logger.error(f"Unexpected error sending message: {e}", exc_info=True)
 
     def fast_loop(self):
         """Ejecuta cada 5 minutos: ingesta de observaciones + check mensajes"""
