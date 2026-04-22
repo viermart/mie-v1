@@ -38,6 +38,7 @@ def main():
     print("🚀 MIE V1 - Market Intelligence Entity")
     print("📌 MARKER: MIE_MARKER_2026_04_22_X1")
     print("📌 VERSION: 2.1 - Debug System Enabled")
+    sys.stdout.flush()
     print("   Available commands: /debug, /debug btc, /debug eth, /debug all")
     print("="*60 + "\n")
 
