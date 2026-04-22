@@ -36,6 +36,7 @@ def main():
     # Log de versión
     print("\n" + "="*60)
     print("🚀 MIE V1 - Market Intelligence Entity")
+    print("📌 MARKER: MIE_MARKER_2026_04_22_X1")
     print("📌 VERSION: 2.1 - Debug System Enabled")
     print("   Available commands: /debug, /debug btc, /debug eth, /debug all")
     print("="*60 + "\n")

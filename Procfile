@@ -1,1 +1,1 @@
-worker: python app.py --force-reload-all-modules
+worker: python main.py
