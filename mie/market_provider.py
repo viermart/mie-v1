@@ -51,7 +51,7 @@ class BinanceProvider(MarketProvider):
                 "symbol": symbol,
                 "price": float(data["lastPrice"]),
                 "change_24h": float(data["priceChangePercent"]),
-                "volume_24h": float(data["quoteAssetVolume"]),
+                "volume_24h": float(data["quoteVolume"]),
                 "high_24h": float(data["highPrice"]),
                 "low_24h": float(data["lowPrice"]),
             }

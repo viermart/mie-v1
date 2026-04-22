@@ -269,7 +269,7 @@ class MIEOrchestrator:
                     parsed = self.binance.parse_observation(raw_obs)
 
                     # Persiste precio como observación
-                    self.db.add_observation(
+                    price_obs_id = self.db.add_observation(
                         asset=asset,
                         observation_type="price",
                         value=parsed["price"],
@@ -294,8 +294,8 @@ class MIEOrchestrator:
                             context=f"value_usdt: {parsed['open_interest_value']:.0f}"
                         )
 
-                    self.logger.info(f"✅ {asset}: price=${parsed['price']:.2f}, "
-                                   f"funding={parsed['funding_rate']:.6f}" if parsed["funding_rate"] else "")
+                    funding_str = f"funding={parsed['funding_rate']:.6f}" if parsed["funding_rate"] else "no_funding"
+                    self.logger.info(f"✅ {asset}: price=${parsed['price']:.2f}, {funding_str}, db_id={price_obs_id}")
 
                 except Exception as e:
                     self.logger.error(f"❌ Error ingesting {asset}: {e}")

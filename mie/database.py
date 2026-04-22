@@ -356,3 +356,10 @@ class MIEDatabase:
         row = cursor.fetchone()
         return row["count"] if row else 0
 
+    def get_observation_count(self, asset: str) -> int:
+        """Alias for count_observations - returns total count for an asset."""
+        cursor = self.conn.cursor()
+        cursor.execute('SELECT COUNT(*) FROM observations WHERE asset = ?', (asset,))
+        result = cursor.fetchone()
+        return result[0] if result else 0
+

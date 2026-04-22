@@ -39,7 +39,7 @@ class MIEMain:
     def run_fast_cycle(self) -> int:
         """Execute one fast cycle."""
         self.logger.info("=" * 60)
-        self.logger.info("CICLO RÁPIDO - Fast Cycle")
+        self.logger.info("🚀 MIE V1 FAST CYCLE - VERSION:20260422-BINANCE-FIX")
         self.logger.info(f"Start: {datetime.utcnow().isoformat()}")
         self.logger.info("=" * 60)
 
