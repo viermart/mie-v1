@@ -11,6 +11,7 @@ Usage:
 """
 
 import sys
+import os
 import argparse
 import json
 from datetime import datetime
@@ -269,10 +270,14 @@ def main():
 
     args = parser.parse_args()
 
+    # Read Telegram credentials from environment if not provided via CLI
+    telegram_token = args.telegram_token or os.getenv("TELEGRAM_TOKEN")
+    telegram_chat_id = args.telegram_chat_id or os.getenv("TELEGRAM_CHAT_ID")
+
     mie = MIEMain(
         db_path=args.db,
-        telegram_token=args.telegram_token,
-        telegram_chat_id=args.telegram_chat_id
+        telegram_token=telegram_token,
+        telegram_chat_id=telegram_chat_id
     )
 
     if args.command == "fast":
