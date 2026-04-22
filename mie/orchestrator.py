@@ -366,18 +366,23 @@ class MIEOrchestrator:
             self.logger.info(f"🔧 Debug parts: {parts}")
             self.logger.info(f"🔧 Debug arg: '{arg}'")
             
-            # Llama a DebugService basado en arg
+            # Llama a DebugService basado en arg - dispatch explícito
             from mie.debug_service import DebugService
             debug_service = DebugService(self.db, self.binance, self.logger)
             
             if arg == "btc":
-                return debug_service.test_binance_fetch("BTCUSDT")
+                response = debug_service.test_binance_fetch("BTCUSDT")
             elif arg == "eth":
-                return debug_service.test_binance_fetch("ETHUSDT")
+                response = debug_service.test_binance_fetch("ETHUSDT")
             elif arg == "all":
-                return debug_service.full_diagnostic()
-            else:  # status o default
-                return f"✅ MIE V1 running\nAssets: {self.assets}\nDB: {self.db_path}"
+                response = debug_service.full_diagnostic()
+            elif arg == "status":
+                response = f"✅ MIE V1 running\nAssets: {self.assets}\nDB: {self.db_path}"
+            else:
+                response = f"✅ MIE V1 running\nAssets: {self.assets}\nDB: {self.db_path}"
+            
+            # Debug route temporario
+            return f"DEBUG ROUTE = {arg}\n\n{response}"
             
         except Exception as e:
             self.logger.error(f"Error in debug command: {e}")
