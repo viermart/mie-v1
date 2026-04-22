@@ -38,6 +38,7 @@ from mie.market_scanner import (
 from mie.signal_to_hypothesis import SignalToHypothesisEngine
 from mie.system_health import SystemStateAnalyzer, HealthAlertGenerator
 from mie.event_bus import EventBusManager
+from mie.config_manager import ConfigManager
 from mie.dialogue import DialogueHandler
 
 
@@ -96,6 +97,9 @@ class MIEOrchestrator:
         
         # Event bus for async component communication
         self.event_bus = EventBusManager(session_id="mie_v1", logger=self.logger)
+        
+        # Configuration and constraint management
+        self.config = ConfigManager(config_dir="config")
 
         # Assets a observar (V1)
         self.assets = ["BTC", "ETH"]
