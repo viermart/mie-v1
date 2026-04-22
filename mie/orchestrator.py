@@ -21,7 +21,6 @@ from mie.binance_client import BinanceClient
 from mie.research_layer import ResearchLayer
 from mie.reporter import Reporter
 from mie.dialogue import DialogueHandler
-from mie.debug_service import DebugService
 
 
 class MIEOrchestrator:
@@ -33,7 +32,6 @@ class MIEOrchestrator:
         self.reporter = Reporter(telegram_token, telegram_chat_id)
         self.dialogue = DialogueHandler(self.db, self._setup_logger())
         self.logger = self._setup_logger()
-        self.debug = DebugService(self.db, self.binance, self.logger)
 
         # Telegram config
         self.telegram_token = telegram_token
@@ -99,12 +97,8 @@ class MIEOrchestrator:
 
                     self.logger.info(f"💬 Mensaje de {user_id}: {text}")
 
-                    # Chequea comandos debug
-                    if text.lower().startswith("/debug"):
-                        response = self._handle_debug_command(text)
-                    else:
-                        # Procesa con DialogueHandler normal
-                        response = self.dialogue.handle_message(text, user_id)
+                    # Procesa con DialogueHandler
+                    response = self.dialogue.handle_message(text, user_id)
 
                     # Envía respuesta
                     self._send_telegram_message(response)
@@ -330,31 +324,6 @@ class MIEOrchestrator:
 
         self.schedule_loops()
 
-        # IMMEDIATE FETCH on startup to populate DB with initial data
-        self.logger.info("
-" + "="*60)
-        self.logger.info("🚀 IMMEDIATE DATA INGESTION (Startup)")
-        self.logger.info("="*60)
-        for asset in self.assets:
-            try:
-                raw_obs = self.binance.ingest_observation(asset)
-                parsed = self.binance.parse_observation(raw_obs)
-                
-                # Persist price observation
-                self.db.add_observation(
-                    asset=asset,
-                    observation_type="price",
-                    value=parsed["price"],
-                    context=f"STARTUP: 24h_change: {parsed.get('price_24h_change', 0):.2f}%"
-                )
-                
-                self.logger.info(f"✅ {asset}: Initial observation saved - ${parsed['price']:.2f}")
-            except Exception as e:
-                self.logger.error(f"❌ Error on startup fetch for {asset}: {e}")
-        
-        self.logger.info("="*60 + "
-")
-
         # Envía heartbeat inicial
         self.reporter.send_heartbeat("MIE V1 iniciado correctamente")
 
@@ -371,95 +340,3 @@ class MIEOrchestrator:
     def stop(self):
         """Detiene ejecución"""
         self.running = False
-
-    def _handle_debug_command(self, command: str) -> str:
-        """Maneja comandos de debug vía Telegram"""
-        try:
-            self.logger.info(f"🔬 DEBUG COMMAND RECEIVED: {command}")
-            
-            parts = command.split()
-            
-            if len(parts) < 2:
-                self.logger.info("Debug: returning summary (no subcommand)")
-                return self.debug.get_debug_summary()
-            
-            subcommand = parts[1].lower()
-            self.logger.info(f"Debug subcommand: {subcommand}")
-            
-            if subcommand == "btc":
-                self.logger.info("Running diagnostic for BTC...")
-                result = self.debug.full_diagnostic("BTC")
-                
-                if result["overall_status"] == "ok":
-                    return f"""✅ **DIAGNOSTIC PASSED: BTC**
-
-🎯 **STAGE RESULTS:**
-1️⃣ Fetch: ✅ OK - {result["stages"]["fetch"].get("last_price", "?")} USD
-2️⃣ Parsing: ✅ OK
-3️⃣ Persistence: ✅ OK - Rows: {result["stages"]["persistence"].get("rows_before")} → {result["stages"]["persistence"].get("rows_after")}
-4️⃣ Query: ✅ OK - {result["stages"]["query"].get("observation_count", 0)} observations, Latest: {result["stages"]["query"].get("latest_price", "?")} USD
-
-🎉 **Pipeline is working correctly!**"""
-                else:
-                    broken_at = result.get("broken_at", "unknown")
-                    error_msg = result["stages"][broken_at].get("message", "Unknown error")
-                    return f"""❌ **DIAGNOSTIC FAILED: BTC**
-
-💔 **BROKEN AT STAGE:** {broken_at.upper()}
-📝 **Error:** {error_msg}
-
-🔧 **Pipeline is broken at {broken_at} stage**
-Check logs for details."""
-            
-            elif subcommand == "eth":
-                self.logger.info("Running diagnostic for ETH...")
-                result = self.debug.full_diagnostic("ETH")
-                
-                if result["overall_status"] == "ok":
-                    return f"""✅ **DIAGNOSTIC PASSED: ETH**
-
-🎯 **STAGE RESULTS:**
-1️⃣ Fetch: ✅ OK
-2️⃣ Parsing: ✅ OK
-3️⃣ Persistence: ✅ OK
-4️⃣ Query: ✅ OK - {result["stages"]["query"].get("observation_count", 0)} observations
-
-🎉 **Pipeline is working correctly!**"""
-                else:
-                    return f"""❌ **DIAGNOSTIC FAILED: ETH**
-Pipeline broken at {result.get("broken_at")} stage."""
-            
-            elif subcommand == "all":
-                self.logger.info("Running diagnostics for BTC and ETH...")
-                btc_result = self.debug.full_diagnostic("BTC")
-                eth_result = self.debug.full_diagnostic("ETH")
-                
-                btc_status = "✅" if btc_result["overall_status"] == "ok" else "❌"
-                eth_status = "✅" if eth_result["overall_status"] == "ok" else "❌"
-                
-                return f"""{btc_status} **BTC:** {btc_result["overall_status"].upper()}
-{eth_status} **ETH:** {eth_result["overall_status"].upper()}"""
-            
-            elif subcommand == "status":
-                self.logger.info("Getting provider status...")
-                status = self.debug.get_provider_status()
-                return f"""📊 **PROVIDER STATUS**
-
-BTC observations (24h): {status["database"]["btc_observations_24h"]}
-ETH observations (24h): {status["database"]["eth_observations_24h"]}
-
-Commands: /debug btc, /debug eth, /debug all"""
-            
-            else:
-                return f"""❓ Unknown debug command: {subcommand}
-
-Available: btc, eth, all, status
-Usage: /debug btc"""
-        
-        except Exception as e:
-            self.logger.error(f"ERROR in _handle_debug_command: {e}", exc_info=True)
-            return f"""❌ **DEBUG ERROR**
-
-Exception: {str(e)[:100]}
-
-Check server logs for details."""
