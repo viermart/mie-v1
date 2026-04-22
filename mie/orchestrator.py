@@ -97,8 +97,12 @@ class MIEOrchestrator:
 
                     self.logger.info(f"💬 Mensaje de {user_id}: {text}")
 
-                    # Procesa con DialogueHandler
-                    response = self.dialogue.handle_message(text, user_id)
+                    # Intercepta comandos /debug
+                    if text.startswith("/debug"):
+                        response = self._handle_debug_command(text, user_id)
+                    else:
+                        # Procesa con DialogueHandler
+                        response = self.dialogue.handle_message(text, user_id)
 
                     # Envía respuesta
                     self._send_telegram_message(response)
@@ -340,3 +344,39 @@ class MIEOrchestrator:
     def stop(self):
         """Detiene ejecución"""
         self.running = False
+
+    def _handle_debug_command(self, text: str, user_id: str) -> str:
+        """
+        Maneja comandos /debug directamente sin pasar por intent_parser.
+        Soporta: /debug, /debug btc, /debug eth, /debug all, /debug status
+        """
+        try:
+            parts = text.split()
+            asset = None
+            
+            if len(parts) > 1:
+                asset = parts[1].upper()  # btc -> BTC
+            
+            self.logger.info(f"🔧 Debug command: {text} (asset={asset})")
+            
+            # Llama a DebugService
+            from mie.debug_service import DebugService
+            debug_service = DebugService(self.db, self.binance, self.logger)
+            
+            if asset == "BTC":
+                result = debug_service.test_binance_fetch("BTCUSDT")
+            elif asset == "ETH":
+                result = debug_service.test_binance_fetch("ETHUSDT")
+            elif asset == "ALL":
+                result = debug_service.full_diagnostic()
+            elif asset == "STATUS":
+                result = f"✅ MIE V1 running\nAssets: {self.assets}\nDB: {self.db_path}"
+            else:
+                # /debug sin argumentos
+                result = "Debug commands:\n/debug btc - Test BTC fetch\n/debug eth - Test ETH fetch\n/debug all - Full diagnostic\n/debug status - Service status"
+            
+            return result
+            
+        except Exception as e:
+            self.logger.error(f"Error in debug command: {e}")
+            return f"❌ Debug error: {str(e)}"
