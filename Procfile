@@ -1,1 +1,1 @@
-web: python -m mie.main scheduler
+web: python mie/lightweight_main.py
