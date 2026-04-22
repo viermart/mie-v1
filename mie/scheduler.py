@@ -20,6 +20,7 @@ class LoopType(Enum):
     FAST = "fast"  # Every 5 minutes
     DAILY = "daily"  # Every 24h at 08:00 UTC
     WEEKLY = "weekly"  # Every Sunday at 17:00 UTC
+    MONTHLY = "monthly"  # Every 1st at 00:00 UTC
 
 
 class ScheduledTask:
@@ -114,6 +115,25 @@ class LoopScheduler:
         }
 
         self.scheduler.every().weeks().tag(day).at(f"{hour:02d}:00").do(task.execute)
+
+        return task
+
+    def register_monthly_loop(self, task_id: str, task_func: Callable,
+                             description: str = "", day: int = 1,
+                             hour: int = 0) -> ScheduledTask:
+        """Register task for monthly loop (default 1st at 00:00 UTC)."""
+        task = ScheduledTask(task_id, task_func, LoopType.MONTHLY, description)
+        self.tasks[task_id] = task
+
+        # Note: schedule library doesn't have built-in monthly scheduling
+        # Using workaround: check daily at specified hour, execute only on 1st
+        def monthly_wrapper():
+            from datetime import datetime
+            if datetime.utcnow().day == day and datetime.utcnow().hour == hour:
+                return task.execute()
+            return False
+
+        self.scheduler.every().day.at(f"{hour:02d}:00").do(monthly_wrapper)
 
         return task
 
@@ -225,6 +245,19 @@ class MIEScheduler:
 
                 return report
 
+        # Monthly loop: Quarterly review and system optimization
+        def monthly_loop():
+            """Monthly loop: System review and optimization (1st at 00:00 UTC)."""
+            if hasattr(self.orchestrator, 'execution'):
+                report = self.orchestrator.execution.execute_cycle(cycle_type="monthly")
+
+                # Generate monthly report
+                if hasattr(self.orchestrator, 'enhanced_reporter'):
+                    # Send monthly summary (reuse weekly report or create new)
+                    self.orchestrator.enhanced_reporter.send_weekly_report()
+
+                return report
+
         # Register tasks
         self.scheduler.register_fast_loop(
             "fast_market_scan",
@@ -246,6 +279,14 @@ class MIEScheduler:
             description="Weekly meta-thinking and portfolio review",
             day="sunday",
             hour=17
+        )
+
+        self.scheduler.register_monthly_loop(
+            "monthly_review",
+            monthly_loop,
+            description="Monthly system review and optimization",
+            day=1,
+            hour=0
         )
 
     def start(self):
@@ -279,6 +320,10 @@ class MIEScheduler:
     def run_weekly_cycle_now(self) -> Dict[str, Any]:
         """Manually trigger weekly cycle."""
         return self.scheduler.run_once(LoopType.WEEKLY)
+
+    def run_monthly_cycle_now(self) -> Dict[str, Any]:
+        """Manually trigger monthly cycle."""
+        return self.scheduler.run_once(LoopType.MONTHLY)
 
     def get_status(self) -> Dict[str, Any]:
         """Get scheduler status."""

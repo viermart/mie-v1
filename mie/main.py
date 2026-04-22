@@ -81,6 +81,21 @@ class MIEMain:
             self.logger.error(f"Weekly cycle failed: {e}")
             return 1
 
+    def run_monthly_cycle(self) -> int:
+        """Execute one monthly cycle."""
+        self.logger.info("=" * 60)
+        self.logger.info("CICLO MENSUAL - Monthly Cycle")
+        self.logger.info(f"Start: {datetime.utcnow().isoformat()}")
+        self.logger.info("=" * 60)
+
+        try:
+            report = self.orchestrator.scheduler.run_monthly_cycle_now()
+            self.logger.info(f"Monthly cycle completed")
+            return 0
+        except Exception as e:
+            self.logger.error(f"Monthly cycle failed: {e}")
+            return 1
+
     def run_scheduler(self) -> int:
         """Start continuous scheduler."""
         self.logger.info("=" * 60)
@@ -198,7 +213,8 @@ COMMANDS:
     fast            Run one fast cycle (observe → analyze → decide → execute)
     daily           Run one daily cycle with deep analysis
     weekly          Run one weekly cycle with meta-thinking
-    scheduler       Start continuous scheduler (fast + daily + weekly loops)
+    monthly         Run one monthly cycle with system review
+    scheduler       Start continuous scheduler (fast + daily + weekly + monthly loops)
     api             Start REST API server (default port 8000)
     status          Check system status and health
     help            Show this help message
@@ -260,7 +276,7 @@ def main():
     )
 
     parser.add_argument("command", nargs="?", default="help",
-                       choices=["fast", "daily", "weekly", "scheduler", "api", "status", "help"])
+                       choices=["fast", "daily", "weekly", "monthly", "scheduler", "api", "status", "help"])
     parser.add_argument("--db", default="mie.db", help="Database path")
     parser.add_argument("--telegram-token", help="Telegram bot token")
     parser.add_argument("--telegram-chat-id", help="Telegram chat ID")
@@ -286,6 +302,8 @@ def main():
         return mie.run_daily_cycle()
     elif args.command == "weekly":
         return mie.run_weekly_cycle()
+    elif args.command == "monthly":
+        return mie.run_monthly_cycle()
     elif args.command == "scheduler":
         return mie.run_scheduler()
     elif args.command == "api":
