@@ -48,11 +48,15 @@ def main():
     anthropic_api_key = os.getenv("ANTHROPIC_API_KEY")
     db_path = os.getenv("DB_PATH", "mie.db")
 
+    # Genera runtime ID único para esta instancia
+    import uuid
+    runtime_id = str(uuid.uuid4())[:8]
+
     # Log de versión y diagnóstico
     print("\n" + "="*60)
     print("🚀 MIE V1 - Market Intelligence Entity")
-    print("📌 MARKER: MIE_MARKER_2026_04_22_X2")
-    print("📌 VERSION: 2.2 - Railway Redeploy with Claude API")
+    print(f"📌 RUNTIME_ID: {runtime_id}")
+    print("📌 VERSION: 2.3 - Single Runtime Enforcement")
     print("\n🔍 DIAGNÓSTICO DE VARIABLES:")
     print(f"  • TELEGRAM_TOKEN: {'✅ Configurada' if telegram_token else '❌ NO CONFIGURADA'}")
     print(f"  • TELEGRAM_CHAT_ID: {'✅ Configurada' if telegram_chat_id else '❌ NO CONFIGURADA'}")
@@ -68,6 +72,28 @@ def main():
         telegram_chat_id=telegram_chat_id,
         anthropic_api_key=anthropic_api_key
     )
+
+    # Acquire runtime lock - only newest instance processes Telegram
+    import time as time_module
+    lock_file = Path("mie_runtime.lock")
+
+    print(f"📍 RUNTIME_ID: {runtime_id}")
+    print(f"🔒 Adquiriendo runtime lock...")
+
+    # Write our runtime ID and timestamp
+    with open(lock_file, "w") as f:
+        f.write(f"{runtime_id}:{time_module.time()}")
+
+    # Wait a moment and re-read - if our ID is still there, we're the active instance
+    time_module.sleep(2)
+    with open(lock_file, "r") as f:
+        active_id, _ = f.read().split(":")
+
+    if active_id != runtime_id:
+        print(f"❌ LOCKED OUT: Another runtime ({active_id}) is active. Exiting.")
+        sys.exit(0)
+
+    print(f"✅ RUNTIME LOCK ACQUIRED: {runtime_id} is active")
 
     # Inicia
     orchestrator.run()
