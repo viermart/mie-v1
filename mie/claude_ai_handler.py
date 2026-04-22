@@ -78,7 +78,7 @@ Responde al usuario de forma natural, sin estructura formal."""
                     "content-type": "application/json",
                 },
                 json={
-                    "model": "claude-opus-4-1",
+                    "model": "claude-haiku-4-5-20251001",
                     "max_tokens": 1024,
                     "system": self.system_prompt,
                     "messages": [
