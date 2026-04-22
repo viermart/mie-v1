@@ -39,6 +39,7 @@ from mie.signal_to_hypothesis import SignalToHypothesisEngine
 from mie.system_health import SystemStateAnalyzer, HealthAlertGenerator
 from mie.event_bus import EventBusManager
 from mie.config_manager import ConfigManager
+from mie.api_server import APIServer
 from mie.dialogue import DialogueHandler
 
 
@@ -100,6 +101,9 @@ class MIEOrchestrator:
         
         # Configuration and constraint management
         self.config = ConfigManager(config_dir="config")
+        
+        # REST API layer
+        self.api = APIServer(self)
 
         # Assets a observar (V1)
         self.assets = ["BTC", "ETH"]
