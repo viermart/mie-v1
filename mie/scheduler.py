@@ -108,13 +108,25 @@ class LoopScheduler:
         self.tasks[task_id] = task
 
         # Schedule with scheduler
-        day_map = {
-            "monday": "monday", "tuesday": "tuesday", "wednesday": "wednesday",
-            "thursday": "thursday", "friday": "friday", "saturday": "saturday",
-            "sunday": "sunday"
-        }
+        # Use every().day check and filter by weekday in the wrapper
+        def weekly_wrapper():
+            from datetime import datetime
+            # Map day names to weekday numbers (Monday=0, Sunday=6)
+            day_map = {
+                "monday": 0, "tuesday": 1, "wednesday": 2,
+                "thursday": 3, "friday": 4, "saturday": 5,
+                "sunday": 6
+            }
+            weekday = day_map.get(day.lower(), 6)  # Default to Sunday
+            current_weekday = datetime.utcnow().weekday()
+            current_hour = datetime.utcnow().hour
 
-        self.scheduler.every().weeks().tag(day).at(f"{hour:02d}:00").do(task.execute)
+            # Execute only on the specified day and hour
+            if current_weekday == weekday and current_hour == hour:
+                return task.execute()
+            return False
+
+        self.scheduler.every().day.at(f"{hour:02d}:00").do(weekly_wrapper)
 
         return task
 
