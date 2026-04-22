@@ -1,6 +1,6 @@
 """MIE V1 - Market Intelligence Entity"""
 
-__version__ = "1.0.0"
+__version__ = "1.2.0"
 __author__ = "Javi"
 
 from .database import MIEDatabase
@@ -9,6 +9,9 @@ from .research_layer import ResearchLayer
 from .reporter import Reporter
 from .dialogue import DialogueHandler
 from .orchestrator import MIEOrchestrator
+from .intent_parser import IntentParser, Intent
+from .market_state import MarketStateEngine
+from .response_builder import ResponseBuilder
 
 __all__ = [
     "MIEDatabase",
@@ -17,4 +20,8 @@ __all__ = [
     "Reporter",
     "DialogueHandler",
     "MIEOrchestrator",
+    "IntentParser",
+    "Intent",
+    "MarketStateEngine",
+    "ResponseBuilder",
 ]
