@@ -374,26 +374,24 @@ class MIEOrchestrator:
 
     def _handle_debug_command(self, command: str) -> str:
         """Maneja comandos de debug vía Telegram"""
-        parts = command.split()
-        
-        if len(parts) < 2:
-            return self.debug.get_debug_summary()
-        
-        subcommand = parts[1].lower()
-        asset = parts[2].upper() if len(parts) > 2 else "BTC"
-        
-        self.logger.info(f"🔬 Debug command: {subcommand} {asset}")
-        
-        if subcommand == "btc" or subcommand == "eth":
-            asset = subcommand.upper()
-            self.logger.info(f"📊 Running full diagnostic for {asset}...")
+        try:
+            self.logger.info(f"🔬 DEBUG COMMAND RECEIVED: {command}")
             
-            # Run full diagnostic
-            result = self.debug.full_diagnostic(asset)
+            parts = command.split()
             
-            # Format response for Telegram
-            if result["overall_status"] == "ok":
-                return f"""✅ **DIAGNOSTIC PASSED: {asset}**
+            if len(parts) < 2:
+                self.logger.info("Debug: returning summary (no subcommand)")
+                return self.debug.get_debug_summary()
+            
+            subcommand = parts[1].lower()
+            self.logger.info(f"Debug subcommand: {subcommand}")
+            
+            if subcommand == "btc":
+                self.logger.info("Running diagnostic for BTC...")
+                result = self.debug.full_diagnostic("BTC")
+                
+                if result["overall_status"] == "ok":
+                    return f"""✅ **DIAGNOSTIC PASSED: BTC**
 
 🎯 **STAGE RESULTS:**
 1️⃣ Fetch: ✅ OK - {result["stages"]["fetch"].get("last_price", "?")} USD
@@ -401,63 +399,67 @@ class MIEOrchestrator:
 3️⃣ Persistence: ✅ OK - Rows: {result["stages"]["persistence"].get("rows_before")} → {result["stages"]["persistence"].get("rows_after")}
 4️⃣ Query: ✅ OK - {result["stages"]["query"].get("observation_count", 0)} observations, Latest: {result["stages"]["query"].get("latest_price", "?")} USD
 
-🎉 **Pipeline is working correctly!**
-"""
-            else:
-                broken_at = result.get("broken_at", "unknown")
-                error_msg = result["stages"][broken_at].get("message", "Unknown error")
-                return f"""❌ **DIAGNOSTIC FAILED: {asset}**
+🎉 **Pipeline is working correctly!**"""
+                else:
+                    broken_at = result.get("broken_at", "unknown")
+                    error_msg = result["stages"][broken_at].get("message", "Unknown error")
+                    return f"""❌ **DIAGNOSTIC FAILED: BTC**
 
 💔 **BROKEN AT STAGE:** {broken_at.upper()}
 📝 **Error:** {error_msg}
 
 🔧 **Pipeline is broken at {broken_at} stage**
-Check logs for details.
-"""
-        
-        elif subcommand == "all":
-            # Test both BTC and ETH
-            btc_result = self.debug.full_diagnostic("BTC")
-            eth_result = self.debug.full_diagnostic("ETH")
+Check logs for details."""
             
-            btc_status = "✅" if btc_result["overall_status"] == "ok" else "❌"
-            eth_status = "✅" if eth_result["overall_status"] == "ok" else "❌"
+            elif subcommand == "eth":
+                self.logger.info("Running diagnostic for ETH...")
+                result = self.debug.full_diagnostic("ETH")
+                
+                if result["overall_status"] == "ok":
+                    return f"""✅ **DIAGNOSTIC PASSED: ETH**
+
+🎯 **STAGE RESULTS:**
+1️⃣ Fetch: ✅ OK
+2️⃣ Parsing: ✅ OK
+3️⃣ Persistence: ✅ OK
+4️⃣ Query: ✅ OK - {result["stages"]["query"].get("observation_count", 0)} observations
+
+🎉 **Pipeline is working correctly!**"""
+                else:
+                    return f"""❌ **DIAGNOSTIC FAILED: ETH**
+Pipeline broken at {result.get("broken_at")} stage."""
             
-            return f"""🔬 **FULL PIPELINE DIAGNOSTIC**
+            elif subcommand == "all":
+                self.logger.info("Running diagnostics for BTC and ETH...")
+                btc_result = self.debug.full_diagnostic("BTC")
+                eth_result = self.debug.full_diagnostic("ETH")
+                
+                btc_status = "✅" if btc_result["overall_status"] == "ok" else "❌"
+                eth_status = "✅" if eth_result["overall_status"] == "ok" else "❌"
+                
+                return f"""{btc_status} **BTC:** {btc_result["overall_status"].upper()}
+{eth_status} **ETH:** {eth_result["overall_status"].upper()}"""
+            
+            elif subcommand == "status":
+                self.logger.info("Getting provider status...")
+                status = self.debug.get_provider_status()
+                return f"""📊 **PROVIDER STATUS**
 
-{btc_status} **BTC:** {btc_result["overall_status"].upper()}
-{eth_status} **ETH:** {eth_result["overall_status"].upper()}
+BTC observations (24h): {status["database"]["btc_observations_24h"]}
+ETH observations (24h): {status["database"]["eth_observations_24h"]}
 
-📊 **Database Status:**
-  • BTC observations (24h): {self.debug.db.count_observations("BTC", 24)}
-  • ETH observations (24h): {self.debug.db.count_observations("ETH", 24)}
+Commands: /debug btc, /debug eth, /debug all"""
+            
+            else:
+                return f"""❓ Unknown debug command: {subcommand}
 
-Use: `/debug btc` or `/debug eth` for detailed stage breakdown
-"""
+Available: btc, eth, all, status
+Usage: /debug btc"""
         
-        elif subcommand == "status":
-            status = self.debug.get_provider_status()
-            return f"""📊 **PROVIDER STATUS**
+        except Exception as e:
+            self.logger.error(f"ERROR in _handle_debug_command: {e}", exc_info=True)
+            return f"""❌ **DEBUG ERROR**
 
-🗄️ **Database:**
-  • BTC observations (24h): {status["database"]["btc_observations_24h"]}
-  • ETH observations (24h): {status["database"]["eth_observations_24h"]}
+Exception: {str(e)[:100]}
 
-⏱️ **Last fetch:**
-  • Timestamp: {status["binance"].get("last_fetch", "Never")}
-
-🔧 **Scheduler:** {status["scheduler"].get("status", "Unknown")}
-
-Commands: `/debug btc`, `/debug eth`, `/debug all`, `/debug status`
-"""
-        
-        else:
-            return """❓ **Unknown debug command**
-
-Available commands:
-  • `/debug btc` - Full diagnostic for BTC
-  • `/debug eth` - Full diagnostic for ETH
-  • `/debug all` - Test both BTC and ETH
-  • `/debug status` - Provider status summary
-  • `/debug` - Short summary
-"""
+Check server logs for details."""
