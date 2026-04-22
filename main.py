@@ -17,10 +17,15 @@ from dotenv import load_dotenv
 # Añade mie al path
 sys.path.insert(0, str(Path(__file__).parent))
 
+from validate_env import validate_env
 from mie.orchestrator import MIEOrchestrator
 
 
 def main():
+    # Validar variables de entorno PRIMERO
+    if not validate_env():
+        sys.exit(1)
+
     # Carga variables de entorno
     env_path = Path(__file__).parent / ".env"
     if env_path.exists():
