@@ -396,12 +396,6 @@ class MIEOrchestrator:
             self.logger.error(f"MONTHLY LOOP error: {e}", exc_info=True)
             self.reporter.send_error(f"Monthly loop error: {e}")
 
-    def dialogue_loop(self):
-        """Ejecuta constantemente: chequea y procesa mensajes de Telegram"""
-        try:
-            self._check_telegram_messages()
-        except Exception as e:
-            self.logger.error(f"Dialogue loop error: {e}")
 
     def _reflect_on_observations(self, lookback_hours: int) -> Dict:
         """Reflexiona sobre observaciones recientes"""
@@ -425,8 +419,8 @@ class MIEOrchestrator:
         return summary
 
     def schedule_loops(self):
-        """Configura schedule con tres ciclos + dialogue"""
-        # Fast loop: cada 5 minutos
+        """Configura schedule con tres ciclos"""
+        # Fast loop: cada 5 minutos (incluye chequeo de Telegram)
         schedule.every(5).minutes.do(self.fast_loop)
 
         # Daily loop: 08:00 UTC
@@ -438,14 +432,10 @@ class MIEOrchestrator:
         # Monthly loop: 1º de mes 18:00 UTC
         schedule.every().day.at("18:00").do(self._check_monthly_schedule)
 
-        # Dialogue loop: cada 30 segundos (chequea Telegram)
-        schedule.every(30).seconds.do(self.dialogue_loop)
-
         self.logger.info("✅ Loops programados:")
-        self.logger.info("  - Fast: cada 5 minutos")
+        self.logger.info("  - Fast: cada 5 minutos (incluye Telegram)")
         self.logger.info("  - Daily: 08:00 UTC")
         self.logger.info("  - Weekly: domingo 08:00 UTC")
-        self.logger.info("  - Dialogue: cada 30 segundos (Telegram)")
 
 
 
