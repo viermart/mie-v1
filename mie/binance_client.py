@@ -37,7 +37,7 @@ class BinanceClient:
         return self.market_manager.get_ticker(symbol)
 
     def get_funding_rate(self, symbol: str) -> Optional[Dict]:
-        """Obtiene funding rate actual (solo futures)"""
+        """Obtiene funding rate actual (solo futures). Degradación elegante si Binance Futures falla."""
         try:
             endpoint = f"{self.futures_url}/fundingRate"
             params = {"symbol": symbol, "limit": 1}
@@ -51,10 +51,11 @@ class BinanceClient:
             data = response.json()
             return data[0] if data else None
         except requests.RequestException as e:
-            raise Exception(f"Error obteniendo funding rate para {symbol}: {e}")
+            self.logger.warning(f"Binance Futures unavailable for {symbol}: {e}. Funding rate skipped.")
+            return None  # Retorna None en lugar de Exception
 
     def get_open_interest(self, symbol: str) -> Optional[Dict]:
-        """Obtiene open interest (solo futures)"""
+        """Obtiene open interest (solo futures). Degradación elegante si Binance Futures falla."""
         try:
             endpoint = f"{self.futures_url}/openInterest"
             params = {"symbol": symbol}
@@ -67,7 +68,8 @@ class BinanceClient:
             response.raise_for_status()
             return response.json()
         except requests.RequestException as e:
-            raise Exception(f"Error obteniendo open interest para {symbol}: {e}")
+            self.logger.warning(f"Binance Futures unavailable for {symbol}: {e}. Open interest skipped.")
+            return None  # Retorna None en lugar de Exception
 
     def get_klines(self, symbol: str, interval: str = "1h", limit: int = 24) -> List[List]:
         """Obtiene velas OHLCV histórico"""
