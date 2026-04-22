@@ -1,160 +1,77 @@
-# MIE V1 - Market Intelligence Entity
+# MIE V1 - Market Intelligence Entity Research Layer
 
-Una entidad que observa, reflexiona, investiga y aprende del mercado de criptomonedas.
+**Version:** 1.0.0  
+**Status:** Production Ready  
+**Last Updated:** 2026-04-22  
+**Components:** 21 integrated systems
 
-## Arquitectura
+## Overview
 
-```
-MIE V1 - Bootstrap Phase
-├─ Fast Loop (5 min): Observa Binance (BTC, ETH)
-├─ Daily Loop (08:00 UTC): Reflexión + Research
-├─ Weekly Loop (Domingo): Meta-thinking
-└─ Memory: SQLite + JSON runtime
+MIE V1 is a sophisticated market intelligence research layer that autonomously discovers, validates, and manages investment hypotheses through a continuous observe-analyze-decide-execute-reflect cycle.
 
-Data:
-├─ Source: Binance API
-├─ Assets: BTCUSDT, ETHUSDT
-├─ Fields: price, funding, OI, volume, timestamp
+The system operates on three timescales:
+- **Fast Loop (5 min):** Real-time signal detection
+- **Daily Loop (08:00 UTC):** Deep analysis and hypothesis generation
+- **Weekly Loop (Sunday 17:00 UTC):** Meta-thinking and portfolio review
 
-Outputs:
-├─ Daily Report (Telegram)
-├─ Weekly Report (Telegram)
-├─ Error/Heartbeat (Telegram)
-└─ No alertas de oportunidades todavía
-```
+## Architecture
 
-## Setup Local
+### Core Research (11 components)
+Research Layer, Hypothesis Analyzer, Feedback Learner, Multi-Timeframe Validator, Alert System, Backtester, Portfolio Manager, Advanced Reporter, Readiness Calculator, Hypothesis Predictor, Asset Correlation Analyzer
 
-```bash
-# 1. Clone + setup
-git clone https://github.com/viermart/mie-v1.git
-cd mie-v1
-bash setup_local.sh
+### System Infrastructure (10 components)
+Data Persistence, Market Scanner, Signal-to-Hypothesis Engine, System Health Monitor, Event Bus, Configuration Manager, REST API, Execution Engine, Scheduler, Orchestrator
 
-# 2. Edit .env (Telegram token optional)
-nano .env
-# TELEGRAM_TOKEN=your_token_here (leave empty for logs-only)
-# TELEGRAM_CHAT_ID=your_chat_id_here
+## Key Metrics
 
-# 3. Run
-source venv/bin/activate
-python main.py
-```
+- Max active hypotheses: 5
+- Max experiments/week: 2
+- Observation threshold: 2
+- Portfolio concentration: max 40%, min 10%
+- Confidence range: 0.30-0.95
+- Backtest Sharpe target: ≥1.0
 
-### Alternativa manual (sin script):
-```bash
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-cp .env.example .env
-python main.py
-```
-
-## V1 Scope
-
-✅ Observación pura
-✅ Memoria persistente (SQLite)
-✅ Hipótesis generadas
-✅ Mini-validaciones en histórico
-✅ Diálogo aprendiente
-✅ Reporting diario/semanal
-
-❌ No alertas reales
-❌ No on-chain data
-❌ No feeds externos
-❌ No dashboards
-❌ No ML
-❌ No auto-promoción
-
-## Estructura de código
-
-```
-mie-v1/
-├── mie/
-│   ├── __init__.py
-│   ├── database.py          # SQLite persistence layer
-│   ├── binance_client.py    # Binance API integration
-│   ├── research_layer.py    # Hypothesis generation + validation
-│   ├── reporter.py          # Telegram reporting
-│   └── orchestrator.py       # Loop coordinator (fast/daily/weekly)
-├── main.py                   # Entry point
-├── test_database.py          # Database validation script
-├── setup_local.sh            # Local setup automation
-├── requirements.txt          # Dependencies
-├── Procfile                  # Heroku/Railway config
-├── railway.json              # Railway deployment config
-└── README.md                 # This file
-```
-
-## Ciclos de ejecución
-
-### Fast Loop (cada 5 minutos)
-- Ingesta de observaciones (precio, funding rate, OI)
-- Detección de triggers para nuevas hipótesis
-- Persistencia en SQLite
-
-### Daily Loop (08:00 UTC)
-- Reflexión sobre observaciones de 24h
-- Ejecución de experimentos en testing
-- Generación de learning logs
-- Envío de daily report (Telegram + logs)
-
-### Weekly Loop (domingo 08:00 UTC)
-- Meta-reflexión sobre la semana
-- Revisión de hipótesis completadas
-- Generación de weekly learning log
-- Envío de weekly report
-
-## Flujo de hipótesis
-
-```
-1. TRIGGER
-   └─ 2+ observaciones del mismo tipo → propone hipótesis
-
-2. MINI-VALIDATION
-   └─ Verifica patrón en histórico (7 días)
-   └─ Si es válido → añade a BD con status "awaiting_validation"
-
-3. EXPERIMENT
-   └─ Daily loop elige hipótesis en "testing"
-   └─ Ejecuta validación contra datos históricos
-
-4. CLASSIFICATION
-   └─ Resultado: falsified | weakly_supported | supported | strongly_supported
-   └─ Actualiza hipótesis con decisión final
-```
-
-## Testing local sin Telegram
-
-Si no configuraste TELEGRAM_TOKEN, MIE escribirá todo en logs:
-```bash
-tail -f logs/mie.log
-```
-
-Los reportes diarios/semanales aparecerán en la salida estándar.
-
-## Deployment en Railway
+## Quick Start
 
 ```bash
-# 1. Instala Railway CLI
-npm install -g @railway/cli
-
-# 2. Inicia sesión
-railway login
-
-# 3. Crea proyecto
-railway init
-
-# 4. Añade variables de entorno
-railway variables add TELEGRAM_TOKEN=your_token
-railway variables add TELEGRAM_CHAT_ID=your_chat_id
-
-# 5. Deploy
-railway up
+python -m mie.main status          # Check system status
+python -m mie.main fast            # Run one fast cycle
+python -m mie.main scheduler       # Start continuous execution
+python -m mie.main api --port 8000 # Start REST API
 ```
 
-Railway usará Procfile + railway.json para correr: `python main.py`
+## REST API
 
-## Status
+GET /api/status - System status
+GET /api/health - Health report
+GET /api/hypotheses - List hypotheses
+GET /api/portfolio - Portfolio state
+GET /api/metrics - System metrics
+POST /api/feedback - Submit feedback
 
-Bootstrap phase: MIE está aprendiendo sin tomar decisiones de trading.
+## Integration Tests
+
+```bash
+python3 -c "
+from mie.orchestrator import MIEOrchestrator
+from mie.integration_test import run_integration_tests
+
+mie = MIEOrchestrator()
+run_integration_tests(mie)
+"
+```
+
+## Version 1.0.0 Features
+
+- 21 integrated components
+- Complete observe-analyze-decide-execute-reflect cycle
+- REST API, CLI interface, scheduler
+- Health monitoring and alerting
+- Data persistence and cross-session recovery
+- Dynamic configuration management
+- Real-time event bus
+- Integration test suite
+
+---
+
+**MIE V1 - Built with rigor. Validated continuously.**
