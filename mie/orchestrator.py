@@ -224,6 +224,10 @@ class MIEOrchestrator:
             # Convierte a string y limita a 4096 chars (límite de Telegram)
             text = str(text)[:4096]
 
+            # Log antes de enviar para verificar duplicados
+            self.logger.info(f"📤 ENVIANDO MENSAJE A TELEGRAM: {text[:100]}...")
+            self.logger.info(f"   Message length: {len(text)} chars")
+
             url = f"https://api.telegram.org/bot{self.telegram_token}/sendMessage"
             params = {
                 "chat_id": self.telegram_chat_id,
