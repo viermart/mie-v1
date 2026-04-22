@@ -31,6 +31,10 @@ from mie.binance_client import BinanceClient
 from mie.research_layer import ResearchLayer
 from mie.reporter import Reporter
 from mie.data_persistence import DataPersistenceManager
+from mie.market_scanner import (
+    PriceActionScanner, VolumeScanner, VolatilityScanner,
+    CorrelationScanner, SignalAggregator
+)
 from mie.dialogue import DialogueHandler
 
 
@@ -65,6 +69,13 @@ class MIEOrchestrator:
         self.backtester = HypothesisBacktester(db=self.db, logger=self.logger)
         self.portfolio = PortfolioManager(db=self.db, logger=self.logger)
         self.persistence = DataPersistenceManager(base_dir="data")
+        
+        # Market scanning components
+        self.price_scanner = PriceActionScanner()
+        self.volume_scanner = VolumeScanner()
+        self.volatility_scanner = VolatilityScanner()
+        self.correlation_scanner = CorrelationScanner()
+        self.signal_aggregator = SignalAggregator(logger=self.logger)
 
         # Assets a observar (V1)
         self.assets = ["BTC", "ETH"]
