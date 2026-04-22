@@ -26,11 +26,15 @@ def main():
     # PRIMERO: Setup - generar .env desde variables de sistema (para Railway)
     setup_env_file()
 
-    # SEGUNDO: Carga variables de entorno desde el .env generado
+    # SEGUNDO: Carga variables de entorno desde el .env generado - ANTES de imports que las usen
     env_path = Path(__file__).parent / ".env"
     if env_path.exists():
-        load_dotenv(env_path)
+        load_dotenv(env_path, override=True)
         print("✅ Archivo .env cargado correctamente")
+        # Verificar que las variables están disponibles
+        print(f"  • ANTHROPIC_API_KEY: {'✅' if os.getenv('ANTHROPIC_API_KEY') else '❌'}")
+        print(f"  • TELEGRAM_TOKEN: {'✅' if os.getenv('TELEGRAM_TOKEN') else '❌'}")
+        print(f"  • TELEGRAM_CHAT_ID: {'✅' if os.getenv('TELEGRAM_CHAT_ID') else '❌'}")
     else:
         print("⚠️  .env no encontrado - usando solo variables de entorno del sistema")
 
@@ -57,11 +61,12 @@ def main():
     sys.stdout.flush()
     print("\n" + "="*60 + "\n")
 
-    # Inicializa orquestador
+    # Inicializa orquestador - PASANDO LA API KEY
     orchestrator = MIEOrchestrator(
         db_path=db_path,
         telegram_token=telegram_token,
-        telegram_chat_id=telegram_chat_id
+        telegram_chat_id=telegram_chat_id,
+        anthropic_api_key=anthropic_api_key
     )
 
     # Inicia

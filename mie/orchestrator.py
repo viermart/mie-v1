@@ -47,9 +47,15 @@ from mie.dialogue import DialogueHandler
 
 class MIEOrchestrator:
     def __init__(self, db_path: str = "mie.db", telegram_token: str = None,
-                 telegram_chat_id: str = None):
+                 telegram_chat_id: str = None, anthropic_api_key: str = None):
         # Setup logger FIRST - used by all other components
         self.logger = self._setup_logger()
+
+        # Asegurar que la API key está disponible en el environment si se pasa
+        if anthropic_api_key:
+            import os
+            os.environ["ANTHROPIC_API_KEY"] = anthropic_api_key
+            self.logger.info("✅ ANTHROPIC_API_KEY inyectada al environment")
 
         self.db = MIEDatabase(db_path)
         self.binance = BinanceClient()

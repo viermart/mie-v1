@@ -26,14 +26,26 @@ class DialogueHandler:
         self.db = db
         self.logger = logger
 
-        # Obtener API key de environment
+        # Obtener API key de environment - con debugging
         api_key = os.getenv("ANTHROPIC_API_KEY")
+
+        # DEBUG: Mostrar si está configurada
+        if api_key:
+            self.logger.info(f"✅ ANTHROPIC_API_KEY encontrada (longitud: {len(api_key)})")
+        else:
+            self.logger.error("❌ ANTHROPIC_API_KEY NO ENCONTRADA en environment")
+            self.logger.error(f"Variables disponibles: {list(os.environ.keys())[:5]}...")
+
         if not api_key:
             self.logger.warning("⚠️ ANTHROPIC_API_KEY no configurada - MIE usará respuestas fallback")
             self.claude_handler = None
         else:
             self.logger.info("✅ Usando Claude API para conversaciones reales")
-            self.claude_handler = ClaudeAIHandler(api_key, db, logger)
+            try:
+                self.claude_handler = ClaudeAIHandler(api_key, db, logger)
+            except Exception as e:
+                self.logger.error(f"❌ Error inicializando ClaudeAIHandler: {e}")
+                self.claude_handler = None
 
         # Inicializar market state para contexto
         self.market_state = MarketStateEngine(db)
