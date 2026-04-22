@@ -294,9 +294,23 @@ class MIEScheduler:
         self.scheduler.running = True
         print("✅ MIE Scheduler started")
 
+        # Counter para chequear mensajes cada N iteraciones (evita spam)
+        telegram_check_counter = 0
+        telegram_check_interval = 10  # Chequea cada 10 segundos
+
         while self.scheduler.running:
             try:
                 self.scheduler.scheduler.run_pending()
+
+                # Chequea mensajes de Telegram cada N iteraciones
+                telegram_check_counter += 1
+                if telegram_check_counter >= telegram_check_interval:
+                    try:
+                        self.orchestrator._check_telegram_messages()
+                    except Exception as e:
+                        self.orchestrator.logger.error(f"Error checking Telegram: {e}")
+                    telegram_check_counter = 0
+
                 time.sleep(1)
             except KeyboardInterrupt:
                 break
