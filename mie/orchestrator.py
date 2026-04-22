@@ -30,6 +30,7 @@ from mie.portfolio_manager import PortfolioManager
 from mie.binance_client import BinanceClient
 from mie.research_layer import ResearchLayer
 from mie.reporter import Reporter
+from mie.data_persistence import DataPersistenceManager
 from mie.dialogue import DialogueHandler
 
 
@@ -63,6 +64,7 @@ class MIEOrchestrator:
         self.alerts = AlertSystem(db=self.db, logger=self.logger)
         self.backtester = HypothesisBacktester(db=self.db, logger=self.logger)
         self.portfolio = PortfolioManager(db=self.db, logger=self.logger)
+        self.persistence = DataPersistenceManager(base_dir="data")
 
         # Assets a observar (V1)
         self.assets = ["BTC", "ETH"]
