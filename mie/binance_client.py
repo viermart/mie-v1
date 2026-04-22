@@ -24,20 +24,8 @@ class BinanceClient:
         }
 
     def get_ticker(self, symbol: str) -> Dict:
-        """Obtiene ticker actual (price, volume, etc.)"""
-        try:
-            endpoint = f"{self.base_url}/ticker/24hr"
-            params = {"symbol": symbol}
-            response = requests.get(
-                endpoint,
-                params=params,
-                headers=self.headers,
-                timeout=self.timeout
-            )
-            response.raise_for_status()
-            return response.json()
-        except requests.RequestException as e:
-            raise Exception(f"Error obteniendo ticker para {symbol}: {e}")
+        """Obtiene ticker actual usando market_manager con fallback."""
+        return self.market_manager.get_ticker(symbol)
 
     def get_funding_rate(self, symbol: str) -> Optional[Dict]:
         """Obtiene funding rate actual (solo futures)"""
