@@ -36,6 +36,7 @@ from mie.market_scanner import (
     CorrelationScanner, SignalAggregator
 )
 from mie.signal_to_hypothesis import SignalToHypothesisEngine
+from mie.system_health import SystemStateAnalyzer, HealthAlertGenerator
 from mie.dialogue import DialogueHandler
 
 
@@ -80,6 +81,17 @@ class MIEOrchestrator:
         
         # Signal-to-hypothesis engine
         self.signal_engine = SignalToHypothesisEngine(logger=self.logger)
+        
+        # System health monitoring
+        self.health_analyzer = SystemStateAnalyzer()
+        self.alert_generator = HealthAlertGenerator()
+        
+        # Register core components for health tracking
+        self.health_analyzer.register_component("research_layer")
+        self.health_analyzer.register_component("backtester")
+        self.health_analyzer.register_component("portfolio")
+        self.health_analyzer.register_component("alerts")
+        self.health_analyzer.register_component("reporter")
 
         # Assets a observar (V1)
         self.assets = ["BTC", "ETH"]
