@@ -12,6 +12,7 @@ from .orchestrator import MIEOrchestrator
 from .intent_parser import IntentParser, Intent
 from .market_state import MarketStateEngine
 from .response_builder import ResponseBuilder
+from .debug_service import DebugService
 
 __all__ = [
     "MIEDatabase",
@@ -24,4 +25,5 @@ __all__ = [
     "Intent",
     "MarketStateEngine",
     "ResponseBuilder",
+    "DebugService",
 ]

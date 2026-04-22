@@ -323,3 +323,19 @@ class MIEDatabase:
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.close()
+
+    def count_observations(self, asset: str = None, lookback_hours: int = 24) -> int:
+        """Cuenta las observaciones en el periodo especificado."""
+        cursor = self.conn.cursor()
+        if asset:
+            cursor.execute('''
+                SELECT COUNT(*) FROM observations
+                WHERE asset = ? AND datetime(timestamp) > datetime('now', '-' || ? || ' hours')
+            ''', (asset, lookback_hours))
+        else:
+            cursor.execute('''
+                SELECT COUNT(*) FROM observations
+                WHERE datetime(timestamp) > datetime('now', '-' || ? || ' hours')
+            ''', (lookback_hours,))
+        result = cursor.fetchone()
+        return result[0] if result else 0
