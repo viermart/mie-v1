@@ -73,20 +73,22 @@ class CoinGeckoProvider(MarketProvider):
     def get_ticker(self, symbol: str) -> Optional[Dict]:
         """symbol = 'BTCUSDT' o 'ETHUSDT'. Mapea a coin_id de CoinGecko."""
         try:
-            # Mapeo simple: BTCUSDT -> bitcoin, ETHUSDT -> ethereum
+            # Corrección 1: Normaliza símbolo correctamente
+            base = symbol.upper().replace("USDT", "")
             coin_map = {
-                "BTCUSDT": "bitcoin",
-                "ETHUSDT": "ethereum",
+                "BTC": "bitcoin",
+                "ETH": "ethereum",
             }
-            coin_id = coin_map.get(symbol)
+            coin_id = coin_map.get(base)
             if not coin_id:
                 self.logger.warning(f"CoinGecko: Unknown symbol {symbol}")
                 return None
             
+            # Corrección 2: Include 24hr change en URL
             url = f"{self.base_url}/simple/price"
             params = {
                 "ids": coin_id,
-                "vs_currency": "usd",
+                "vs_currencies": "usd",
                 "include_market_cap": "true",
                 "include_24hr_vol": "true",
                 "include_24hr_change": "true",
@@ -102,17 +104,27 @@ class CoinGeckoProvider(MarketProvider):
             if not coin_data:
                 return None
             
+            # Corrección 4: Output estándar completo con raw_response
             return {
                 "symbol": symbol,
-                "price": float(coin_data.get("usd", 0)),
-                "change_24h": float(coin_data.get("usd_24h_change", 0)),
-                "volume_24h": float(coin_data.get("usd_24h_vol", 0)),
-                "high_24h": float(coin_data.get("usd_24h_high", 0)),
-                "low_24h": float(coin_data.get("usd_24h_low", 0)),
+                "price": float(coin_data.get("usd", 0.0)),
+                "volume_24h": float(coin_data.get("usd_24h_vol", 0.0)),
+                "change_24h": float(coin_data.get("usd_24h_change", 0.0)),
+                "high_24h": float(coin_data.get("usd_24h_high", 0.0)),
+                "low_24h": float(coin_data.get("usd_24h_low", 0.0)),
+                "provider": self.name(),
+                "http_code": response.status_code,
+                "status": "ok",
+                "raw_response": data
             }
         except Exception as e:
             self.logger.error(f"CoinGecko fetch error ({symbol}): {e}")
-            return None
+            return {
+                "status": "error",
+                "message": str(e),
+                "provider": self.name(),
+                "http_code": getattr(e, 'response', {}).status_code if hasattr(e, 'response') else 'N/A'
+            }
 
 
 class MarketDataManager:

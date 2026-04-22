@@ -42,53 +42,42 @@ class DebugService:
 
         self.logger.info(f"[{stage}] {asset}: {status} - {json.dumps(data)[:100]}")
 
-    def test_binance_fetch(self, asset: str = "BTC") -> Dict:
-        """
-        STAGE 1: Verifica que Binance API responde correctamente.
-        Returns: {"status": "ok"|"error", "http_code": int, "payload": {...}}
-        """
-        self.logger.info(f"🔍 STAGE 1: Binance Fetch para {asset}...")
-
+    def test_binance_fetch(self, symbol: str = "BTCUSDT") -> str:
+        """Test market data fetch con inspección de raw response."""
         try:
-            raw = self.binance.ingest_observation(asset)
-
-            # Verifica que tiene ticker
-            if "ticker" not in raw or raw["ticker"] is None:
-                self._log_debug("STAGE1_FETCH", asset, {"error": "No ticker in response"}, "ERROR")
-                return {"status": "error", "stage": "fetch", "message": "No ticker data"}
-
-            ticker = raw["ticker"]
-            http_status = ticker.get("code") or 200  # Binance devuelve 'code' en errores
-
-            if http_status != 200:
-                self._log_debug("STAGE1_FETCH", asset, {
-                    "http_code": http_status,
-                    "error": ticker.get("msg", "Unknown error")
-                }, "ERROR")
-                return {
-                    "status": "error",
-                    "http_code": http_status,
-                    "message": ticker.get("msg", "HTTP Error")
-                }
-
-            # Success
-            self._log_debug("STAGE1_FETCH", asset, {
-                "http_code": 200,
-                "last_price": ticker.get("lastPrice"),
-                "timestamp": raw.get("timestamp")
-            }, "OK")
-
-            return {
-                "status": "ok",
-                "http_code": 200,
-                "last_price": float(ticker.get("lastPrice", 0)),
-                "volume_24h": float(ticker.get("volume", 0)),
-                "timestamp": raw.get("timestamp")
-            }
-
+            # Obtiene resultado del market manager
+            result = self.binance.market_manager.get_ticker(symbol)
+            
+            # Output estándar para Telegram
+            lines = []
+            lines.append(f"🔍 **DEBUG: Market Data for {symbol}**")
+            lines.append("")
+            lines.append(f"**Provider:** {result.get('provider', 'unknown')}")
+            lines.append(f"**HTTP Code:** {result.get('http_code', 'N/A')}")
+            lines.append(f"**Status:** {result.get('status', 'N/A')}")
+            lines.append("")
+            
+            # Raw response - CLAVE para diagnóstico
+            if 'raw_response' in result and isinstance(result.get('raw_response'), dict):
+                raw = result['raw_response']
+                lines.append(f"**Raw Response Keys:** {list(raw.keys())}")
+                lines.append(f"**Raw Data (truncated):** {str(raw)[:500]}")
+                lines.append("")
+            
+            # Parsed values
+            lines.append(f"**Parsed Price:** {result.get('price', 'N/A')}")
+            lines.append(f"**Parsed Volume:** {result.get('volume_24h', 'N/A')}")
+            lines.append(f"**Parsed Change:** {result.get('change_24h', 'N/A')}")
+            lines.append("")
+            
+            if result.get('http_code') != 200:
+                lines.append(f"⚠️  **HTTP Error:** {result.get('http_code')}")
+            
+            return "
+".join(lines)
+        
         except Exception as e:
-            self._log_debug("STAGE1_FETCH", asset, {"error": str(e)}, "ERROR")
-            return {"status": "error", "message": str(e)}
+            return f"❌ **ERROR in test_binance_fetch:** {str(e)}"
 
     def test_parsing(self, asset: str = "BTC") -> Dict:
         """
