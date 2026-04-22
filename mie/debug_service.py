@@ -45,10 +45,8 @@ class DebugService:
     def test_binance_fetch(self, symbol: str = "BTCUSDT") -> str:
         """Test market data fetch con inspección de raw response."""
         try:
-            # Obtiene resultado del market manager
             result = self.binance.market_manager.get_ticker(symbol)
             
-            # Output estándar para Telegram
             lines = []
             lines.append(f"🔍 **DEBUG: Market Data for {symbol}**")
             lines.append("")
@@ -57,14 +55,12 @@ class DebugService:
             lines.append(f"**Status:** {result.get('status', 'N/A')}")
             lines.append("")
             
-            # Raw response - CLAVE para diagnóstico
             if 'raw_response' in result and isinstance(result.get('raw_response'), dict):
                 raw = result['raw_response']
                 lines.append(f"**Raw Response Keys:** {list(raw.keys())}")
                 lines.append(f"**Raw Data (truncated):** {str(raw)[:500]}")
                 lines.append("")
             
-            # Parsed values
             lines.append(f"**Parsed Price:** {result.get('price', 'N/A')}")
             lines.append(f"**Parsed Volume:** {result.get('volume_24h', 'N/A')}")
             lines.append(f"**Parsed Change:** {result.get('change_24h', 'N/A')}")
@@ -73,8 +69,7 @@ class DebugService:
             if result.get('http_code') != 200:
                 lines.append(f"⚠️  **HTTP Error:** {result.get('http_code')}")
             
-            return "
-".join(lines)
+            return "\n".join(lines)
         
         except Exception as e:
             return f"❌ **ERROR in test_binance_fetch:** {str(e)}"
@@ -90,7 +85,6 @@ class DebugService:
             raw = self.binance.ingest_observation(asset)
             parsed = self.binance.parse_observation(raw)
 
-            # Verifica campos críticos
             required_fields = ["asset", "price", "timestamp"]
             missing = [f for f in required_fields if f not in parsed or parsed[f] is None]
 
@@ -128,15 +122,12 @@ class DebugService:
         self.logger.info(f"🔍 STAGE 3: Persistence para {asset}...")
 
         try:
-            # Count antes
             rows_before = self.db.count_observations(asset, lookback_hours=24)
             self.logger.info(f"   Rows before: {rows_before}")
 
-            # Ingesta y persiste
             raw = self.binance.ingest_observation(asset)
             parsed = self.binance.parse_observation(raw)
 
-            # Inserta observación de precio
             self.db.add_observation(
                 asset=asset,
                 observation_type="price",
@@ -144,7 +135,6 @@ class DebugService:
                 context=f"24h_change: {parsed.get('price_24h_change', 0):.2f}%"
             )
 
-            # Count después
             rows_after = self.db.count_observations(asset, lookback_hours=24)
             self.logger.info(f"   Rows after: {rows_after}")
 
@@ -185,7 +175,6 @@ class DebugService:
         self.logger.info(f"🔍 STAGE 4: Query Layer para {asset}...")
 
         try:
-            # Query observaciones de last 24h
             observations = self.db.get_observations(asset=asset, lookback_hours=24)
 
             if not observations:
@@ -199,7 +188,6 @@ class DebugService:
                     "message": "No observations found in last 24h"
                 }
 
-            # Get latest price from observations
             prices = [o.get("value") for o in observations if o.get("observation_type") == "price"]
             if not prices:
                 self._log_debug("STAGE4_QUERY", asset, {
@@ -247,7 +235,6 @@ class DebugService:
             "stages": {}
         }
 
-        # STAGE 1: Fetch
         self.logger.info("\n[1/4] Testing Binance fetch...")
         stage1 = self.test_binance_fetch(asset)
         results["stages"]["fetch"] = stage1
@@ -258,7 +245,6 @@ class DebugService:
             results["broken_at"] = "fetch"
             return results
 
-        # STAGE 2: Parse
         self.logger.info("\n[2/4] Testing parsing...")
         stage2 = self.test_parsing(asset)
         results["stages"]["parsing"] = stage2
@@ -269,7 +255,6 @@ class DebugService:
             results["broken_at"] = "parsing"
             return results
 
-        # STAGE 3: Persist
         self.logger.info("\n[3/4] Testing persistence...")
         stage3 = self.test_persistence(asset)
         results["stages"]["persistence"] = stage3
@@ -280,7 +265,6 @@ class DebugService:
             results["broken_at"] = "persistence"
             return results
 
-        # STAGE 4: Query
         self.logger.info("\n[4/4] Testing query layer...")
         stage4 = self.test_query_layer(asset)
         results["stages"]["query"] = stage4
@@ -291,7 +275,6 @@ class DebugService:
             results["broken_at"] = "query"
             return results
 
-        # All stages passed
         self.logger.info(f"\n✅ ALL STAGES PASSED FOR {asset}")
         results["overall_status"] = "ok"
 
@@ -311,7 +294,7 @@ class DebugService:
         return {
             "timestamp": datetime.utcnow().isoformat(),
             "binance": {
-                "status": "unknown",  # Será actualizado por orchestrator
+                "status": "unknown",
                 "last_fetch": None,
                 "error_count": 0
             },
@@ -321,7 +304,7 @@ class DebugService:
                 "eth_observations_24h": self.db.count_observations("ETH", 24),
             },
             "scheduler": {
-                "status": "unknown"  # Será actualizado por orchestrator
+                "status": "unknown"
             }
         }
 
