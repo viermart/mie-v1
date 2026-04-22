@@ -366,8 +366,18 @@ class MIEOrchestrator:
             self.logger.info(f"🔧 Debug parts: {parts}")
             self.logger.info(f"🔧 Debug arg: '{arg}'")
             
-            # Respuesta temporal para verificar parsing
-            return f"DEBUG ARG = {arg}"
+            # Llama a DebugService basado en arg
+            from mie.debug_service import DebugService
+            debug_service = DebugService(self.db, self.binance, self.logger)
+            
+            if arg == "btc":
+                return debug_service.test_binance_fetch("BTCUSDT")
+            elif arg == "eth":
+                return debug_service.test_binance_fetch("ETHUSDT")
+            elif arg == "all":
+                return debug_service.full_diagnostic()
+            else:  # status o default
+                return f"✅ MIE V1 running\nAssets: {self.assets}\nDB: {self.db_path}"
             
         except Exception as e:
             self.logger.error(f"Error in debug command: {e}")
