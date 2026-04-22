@@ -57,3 +57,4 @@ Thumbs.db
 dist/
 build/
 *.tar.gz
+.env
