@@ -43,6 +43,7 @@ from mie.api_server import APIServer
 from mie.execution_engine import ExecutionEngine
 from mie.scheduler import MIEScheduler
 from mie.dialogue import DialogueHandler
+from mie.command_handler import CommandHandler
 
 
 class MIEOrchestrator:
@@ -62,6 +63,7 @@ class MIEOrchestrator:
         self.research = ResearchLayer(self.db)
         self.reporter = Reporter(telegram_token, telegram_chat_id)
         self.dialogue = DialogueHandler(self.db, self.logger)
+        self.commands = CommandHandler(self.db, self.logger)
 
         # Telegram config
         self.telegram_token = telegram_token
@@ -186,17 +188,16 @@ class MIEOrchestrator:
 
                         self.logger.info(f"💬 Mensaje de {user_id}: {text}")
 
-                        # Intercepta comandos /debug
-                        if text.startswith("/debug"):
-                            response = self._handle_debug_command(text, user_id)
-                            self.logger.debug(f"Debug response: {response}")
-                            self._send_telegram_message(response, use_markdown=False)
+                        # PRIMERO: Intenta manejar como comando (/status, /btc, /eth, /market, /what_are_you_seeing)
+                        cmd_response = self.commands.handle_command(text, user_id)
+                        if cmd_response is not None:
+                            self.logger.info(f"✅ Comando procesado: {text.split()[0]}")
+                            self._send_telegram_message(cmd_response, use_markdown=False)
+                        # SEGUNDO: Si no es comando, procesa con DialogueHandler (Claude)
                         else:
-                            # Procesa con DialogueHandler
-                            self.logger.debug(f"Procesando con DialogueHandler...")
+                            self.logger.debug(f"Procesando mensaje con Claude...")
                             response = self.dialogue.handle_message(text, user_id)
-                            self.logger.debug(f"DialogueHandler response: {response}")
-                            # Diálogo normal con markdown
+                            self.logger.debug(f"Respuesta Claude: {response[:80]}...")
                             self._send_telegram_message(response, use_markdown=True)
                 except Exception as e:
                     self.logger.error(f"Error procesando update {update.get('update_id')}: {e}", exc_info=True)
