@@ -40,6 +40,7 @@ from mie.system_health import SystemStateAnalyzer, HealthAlertGenerator
 from mie.event_bus import EventBusManager
 from mie.config_manager import ConfigManager
 from mie.api_server import APIServer
+from mie.execution_engine import ExecutionEngine
 from mie.dialogue import DialogueHandler
 
 
@@ -104,6 +105,9 @@ class MIEOrchestrator:
         
         # REST API layer
         self.api = APIServer(self)
+        
+        # Core execution engine
+        self.execution = ExecutionEngine(self)
 
         # Assets a observar (V1)
         self.assets = ["BTC", "ETH"]
