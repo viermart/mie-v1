@@ -13,15 +13,24 @@ from typing import Dict, List, Optional
 
 
 class BinanceClient:
-    def __init__(self, timeout: int = 10):
+    def __init__(self, timeout: int = 10, logger=None):
+        import logging
+        from .market_provider import BinanceProvider, CoinGeckoProvider, MarketDataManager
+        
         self.base_url = "https://api.binance.com/api/v3"
         self.futures_url = "https://fapi.binance.com/fapi/v1"
         self.timeout = timeout
+        self.logger = logger or logging.getLogger(__name__)
         self.headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
             "Accept": "application/json",
             "Accept-Language": "en-US,en;q=0.9",
         }
+        
+        # Inicializa market manager con fallback
+        binance = BinanceProvider(self.logger)
+        coingecko = CoinGeckoProvider(self.logger)
+        self.market_manager = MarketDataManager(binance, coingecko, self.logger)
 
     def get_ticker(self, symbol: str) -> Dict:
         """Obtiene ticker actual usando market_manager con fallback."""

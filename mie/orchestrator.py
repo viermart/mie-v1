@@ -100,31 +100,42 @@ class MIEOrchestrator:
                     # Intercepta comandos /debug
                     if text.startswith("/debug"):
                         response = self._handle_debug_command(text, user_id)
+                        # Debug messages sin markdown parsing
+                        self._send_telegram_message(response, use_markdown=False)
                     else:
                         # Procesa con DialogueHandler
                         response = self.dialogue.handle_message(text, user_id)
-
-                    # Envía respuesta
-                    self._send_telegram_message(response)
+                        # Diálogo normal con markdown
+                        self._send_telegram_message(response, use_markdown=True)
 
         except requests.RequestException as e:
             self.logger.error(f"Error checking Telegram messages: {e}")
         except Exception as e:
             self.logger.error(f"Error processing Telegram message: {e}")
 
-    def _send_telegram_message(self, text: str):
-        """Envía un mensaje a Telegram"""
+    def _send_telegram_message(self, text: str, use_markdown: bool = True):
+        """Envía un mensaje a Telegram. Convierte dicts a string si es necesario."""
         if not self.telegram_token or not self.telegram_chat_id:
             self.logger.warning("Telegram no configurado, mensaje no enviado")
             return
 
         try:
+            # Convierte dict a string si es necesario
+            if isinstance(text, dict):
+                text = str(text)
+            
+            # Limita a 4096 chars (límite de Telegram)
+            text = str(text)[:4096]
+            
             url = f"https://api.telegram.org/bot{self.telegram_token}/sendMessage"
             params = {
                 "chat_id": self.telegram_chat_id,
                 "text": text,
-                "parse_mode": "Markdown"
             }
+            
+            # Solo usa Markdown si está habilitado
+            if use_markdown:
+                params["parse_mode"] = "Markdown"
 
             response = requests.post(url, params=params, timeout=10)
             response.raise_for_status()
