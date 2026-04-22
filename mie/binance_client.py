@@ -17,13 +17,23 @@ class BinanceClient:
         self.base_url = "https://api.binance.com/api/v3"
         self.futures_url = "https://fapi.binance.com/fapi/v1"
         self.timeout = timeout
+        self.headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            "Accept": "application/json",
+            "Accept-Language": "en-US,en;q=0.9",
+        }
 
     def get_ticker(self, symbol: str) -> Dict:
         """Obtiene ticker actual (price, volume, etc.)"""
         try:
             endpoint = f"{self.base_url}/ticker/24hr"
             params = {"symbol": symbol}
-            response = requests.get(endpoint, params=params, timeout=self.timeout)
+            response = requests.get(
+                endpoint,
+                params=params,
+                headers=self.headers,
+                timeout=self.timeout
+            )
             response.raise_for_status()
             return response.json()
         except requests.RequestException as e:
@@ -34,7 +44,12 @@ class BinanceClient:
         try:
             endpoint = f"{self.futures_url}/fundingRate"
             params = {"symbol": symbol, "limit": 1}
-            response = requests.get(endpoint, params=params, timeout=self.timeout)
+            response = requests.get(
+                endpoint,
+                params=params,
+                headers=self.headers,
+                timeout=self.timeout
+            )
             response.raise_for_status()
             data = response.json()
             return data[0] if data else None
@@ -46,7 +61,12 @@ class BinanceClient:
         try:
             endpoint = f"{self.futures_url}/openInterest"
             params = {"symbol": symbol}
-            response = requests.get(endpoint, params=params, timeout=self.timeout)
+            response = requests.get(
+                endpoint,
+                params=params,
+                headers=self.headers,
+                timeout=self.timeout
+            )
             response.raise_for_status()
             return response.json()
         except requests.RequestException as e:
@@ -57,7 +77,12 @@ class BinanceClient:
         try:
             endpoint = f"{self.base_url}/klines"
             params = {"symbol": symbol, "interval": interval, "limit": limit}
-            response = requests.get(endpoint, params=params, timeout=self.timeout)
+            response = requests.get(
+                endpoint,
+                params=params,
+                headers=self.headers,
+                timeout=self.timeout
+            )
             response.raise_for_status()
             return response.json()
         except requests.RequestException as e:
