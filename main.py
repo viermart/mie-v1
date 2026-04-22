@@ -2,6 +2,11 @@
 """
 MIE V1 - Market Intelligence Entity
 Bootstrap phase: Pure observation, reflection, and learning
+
+VERSION: 2.1 - Debug System Ready
+- Debug commands: /debug, /debug btc, /debug eth, /debug all, /debug status
+- 4-stage pipeline diagnostics
+- Immediate data ingestion on startup
 """
 
 import os
@@ -27,6 +32,13 @@ def main():
     telegram_token = os.getenv("TELEGRAM_TOKEN")
     telegram_chat_id = os.getenv("TELEGRAM_CHAT_ID")
     db_path = os.getenv("DB_PATH", "mie.db")
+
+    # Log de versión
+    print("\n" + "="*60)
+    print("🚀 MIE V1 - Market Intelligence Entity")
+    print("📌 VERSION: 2.1 - Debug System Enabled")
+    print("   Available commands: /debug, /debug btc, /debug eth, /debug all")
+    print("="*60 + "\n")
 
     # Inicializa orquestador
     orchestrator = MIEOrchestrator(
