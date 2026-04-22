@@ -17,26 +17,26 @@ from dotenv import load_dotenv
 # Añade mie al path
 sys.path.insert(0, str(Path(__file__).parent))
 
-# Setup: generar .env desde variables de sistema (para Railway)
 from setup_env import setup_env_file
-setup_env_file()
-
 from validate_env import validate_env
 from mie.orchestrator import MIEOrchestrator
 
 
 def main():
-    # Validar variables de entorno PRIMERO
-    if not validate_env():
-        sys.exit(1)
+    # PRIMERO: Setup - generar .env desde variables de sistema (para Railway)
+    setup_env_file()
 
-    # Carga variables de entorno
+    # SEGUNDO: Carga variables de entorno desde el .env generado
     env_path = Path(__file__).parent / ".env"
     if env_path.exists():
         load_dotenv(env_path)
-        print("✅ Archivo .env cargado")
+        print("✅ Archivo .env cargado correctamente")
     else:
-        print("⚠️  .env no encontrado - usando variables de entorno del sistema")
+        print("⚠️  .env no encontrado - usando solo variables de entorno del sistema")
+
+    # TERCERO: Validar variables de entorno después de cargarlas
+    if not validate_env():
+        sys.exit(1)
 
     # Obtiene configuración
     telegram_token = os.getenv("TELEGRAM_TOKEN")
