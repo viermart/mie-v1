@@ -90,7 +90,8 @@ class DialogueHandler:
             self._save_dialogue(message, response, user_id)
 
             self.logger.info(f"🤖 Respuesta Claude: {response[:80]}...")
-            return response
+            # Add production marker for validation
+            return f"[MIE-PROD-ONLY] {response}"
 
         except Exception as e:
             self.logger.error(f"Error en handle_message: {e}", exc_info=True)
