@@ -35,6 +35,7 @@ from mie.market_scanner import (
     PriceActionScanner, VolumeScanner, VolatilityScanner,
     CorrelationScanner, SignalAggregator
 )
+from mie.signal_to_hypothesis import SignalToHypothesisEngine
 from mie.dialogue import DialogueHandler
 
 
@@ -76,6 +77,9 @@ class MIEOrchestrator:
         self.volatility_scanner = VolatilityScanner()
         self.correlation_scanner = CorrelationScanner()
         self.signal_aggregator = SignalAggregator(logger=self.logger)
+        
+        # Signal-to-hypothesis engine
+        self.signal_engine = SignalToHypothesisEngine(logger=self.logger)
 
         # Assets a observar (V1)
         self.assets = ["BTC", "ETH"]
