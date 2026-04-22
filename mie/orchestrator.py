@@ -26,6 +26,7 @@ from mie.hypothesis_predictor import HypothesisPredictor
 from mie.asset_correlation import AssetCorrelationAnalyzer
 from mie.alert_system import AlertSystem
 from mie.backtester import HypothesisBacktester
+from mie.portfolio_manager import PortfolioManager
 from mie.binance_client import BinanceClient
 from mie.research_layer import ResearchLayer
 from mie.reporter import Reporter
@@ -61,6 +62,7 @@ class MIEOrchestrator:
         self.correlation = AssetCorrelationAnalyzer(db=self.db, logger=self.logger)
         self.alerts = AlertSystem(db=self.db, logger=self.logger)
         self.backtester = HypothesisBacktester(db=self.db, logger=self.logger)
+        self.portfolio = PortfolioManager(db=self.db, logger=self.logger)
 
         # Assets a observar (V1)
         self.assets = ["BTC", "ETH"]
