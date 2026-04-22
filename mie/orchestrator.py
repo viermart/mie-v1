@@ -333,6 +333,9 @@ class MIEOrchestrator:
         # Weekly loop: domingo a las 08:00 UTC
         schedule.every().sunday.at("08:00").do(self.weekly_loop)
 
+        # Monthly loop: 1º de mes 18:00 UTC
+        schedule.every().day.at("18:00").do(self._check_monthly_schedule)
+
         # Dialogue loop: cada 30 segundos (chequea Telegram)
         schedule.every(30).seconds.do(self.dialogue_loop)
 
@@ -342,6 +345,13 @@ class MIEOrchestrator:
         self.logger.info("  - Weekly: domingo 08:00 UTC")
         self.logger.info("  - Dialogue: cada 30 segundos (Telegram)")
 
+
+
+    def _check_monthly_schedule(self):
+        """Helper para ejecutar monthly_loop el 1º de cada mes a las 18:00 UTC"""
+        from datetime import datetime
+        if datetime.utcnow().day == 1 and datetime.utcnow().hour == 18:
+            self.monthly_loop()
 
     def run(self):
         """Loop principal: ejecuta scheduler"""

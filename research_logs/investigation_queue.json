@@ -1,0 +1,55 @@
+{
+  "queue": [
+    {
+      "id": "hyp_ETH_price_c86c6c",
+      "observation": "ETH price pattern",
+      "observation_count": 9,
+      "observation_examples": [
+        {
+          "timestamp": "2026-04-22T05:08:12.403865",
+          "value": 30300.0
+        },
+        {
+          "timestamp": "2026-04-22T05:08:12.403860",
+          "value": 30250.0
+        },
+        {
+          "timestamp": "2026-04-22T05:08:12.403857",
+          "value": 30200.0
+        }
+      ],
+      "born_date": "2026-04-22T05:08:12.407132",
+      "status": "awaiting_validation",
+      "confidence": "repeated_observation",
+      "priority": 0.5,
+      "asset": "ETH",
+      "obs_type": "price"
+    },
+    {
+      "id": "hyp_ETH_funding_rate_1426d9",
+      "observation": "ETH funding_rate pattern",
+      "observation_count": 3,
+      "observation_examples": [
+        {
+          "timestamp": "2026-04-22T05:08:12.403868",
+          "value": 0.007
+        },
+        {
+          "timestamp": "2026-04-22T05:08:12.403841",
+          "value": 0.006
+        },
+        {
+          "timestamp": "2026-04-22T05:08:12.403816",
+          "value": 0.005
+        }
+      ],
+      "born_date": "2026-04-22T05:08:12.408627",
+      "status": "awaiting_validation",
+      "confidence": "repeated_observation",
+      "priority": 0.5,
+      "asset": "ETH",
+      "obs_type": "funding_rate"
+    }
+  ],
+  "last_updated": "2026-04-22T05:08:12.408896"
+}

@@ -1,0 +1,64 @@
+{
+  "active": [
+    {
+      "id": "hyp_BTC_price_3a24bb",
+      "observation": "BTC price pattern",
+      "observation_count": 9,
+      "observation_examples": [
+        {
+          "timestamp": "2026-04-22T05:08:12.403851",
+          "value": 30300.0
+        },
+        {
+          "timestamp": "2026-04-22T05:08:12.403848",
+          "value": 30250.0
+        },
+        {
+          "timestamp": "2026-04-22T05:08:12.403845",
+          "value": 30200.0
+        }
+      ],
+      "born_date": "2026-04-22T05:08:12.404439",
+      "status": "awaiting_validation",
+      "confidence": "strongly_supported",
+      "priority": 0.5,
+      "asset": "BTC",
+      "obs_type": "price",
+      "promoted_date": "2026-04-22T05:08:12.410058",
+      "assigned_experiment": null,
+      "decision": "monitor_closely",
+      "last_updated": "2026-04-22T05:08:12.414164"
+    },
+    {
+      "id": "hyp_BTC_funding_rate_48687b",
+      "observation": "BTC funding_rate pattern",
+      "observation_count": 3,
+      "observation_examples": [
+        {
+          "timestamp": "2026-04-22T05:08:12.403854",
+          "value": 0.007
+        },
+        {
+          "timestamp": "2026-04-22T05:08:12.403829",
+          "value": 0.006
+        },
+        {
+          "timestamp": "2026-04-22T05:08:12.403802",
+          "value": 0.005
+        }
+      ],
+      "born_date": "2026-04-22T05:08:12.405736",
+      "status": "awaiting_validation",
+      "confidence": "insufficient_data",
+      "priority": 0.5,
+      "asset": "BTC",
+      "obs_type": "funding_rate",
+      "promoted_date": "2026-04-22T05:08:12.411740",
+      "assigned_experiment": null,
+      "decision": "awaiting_more_data",
+      "last_updated": "2026-04-22T05:08:12.415475"
+    }
+  ],
+  "completed": [],
+  "last_updated": null
+}
