@@ -1,0 +1,10 @@
+{
+  "type": "30-day bootstrap",
+  "obs": 314,
+  "hyp_gen": 0,
+  "promoted": 60,
+  "validated": 150,
+  "final_active": 5,
+  "final_queue": 14,
+  "violations": 0
+}
