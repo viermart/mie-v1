@@ -21,6 +21,7 @@ from mie.hypothesis_analyzer import HypothesisAnalyzer
 from mie.feedback_learner import FeedbackLearner
 from mie.multi_timeframe_validator import MultiTimeframeValidator
 from mie.enhanced_telegram_reporter import EnhancedTelegramReporter
+from mie.readiness_calculator import ReadinessCalculator
 from mie.binance_client import BinanceClient
 from mie.research_layer import ResearchLayer
 from mie.reporter import Reporter
@@ -51,6 +52,7 @@ class MIEOrchestrator:
             validator=self.validator_mtf,
             logger=self.logger
         )
+        self.readiness = ReadinessCalculator(db=self.db, logger=self.logger)
 
         # Assets a observar (V1)
         self.assets = ["BTC", "ETH"]
