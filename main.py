@@ -3,7 +3,7 @@
 MIE V1 - Market Intelligence Entity
 Bootstrap phase: Pure observation, reflection, and learning
 
-VERSION: 2.1 - Debug System Ready
+VERSION: 2.2 - Railway Redeploy with Claude API
 - Debug commands: /debug, /debug btc, /debug eth, /debug all, /debug status
 - 4-stage pipeline diagnostics
 - Immediate data ingestion on startup
