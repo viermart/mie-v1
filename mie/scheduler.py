@@ -229,7 +229,11 @@ class MIEScheduler:
         # Fast loop: Market scanning and signal detection
         def fast_loop():
             """Fast loop: Scan market, detect signals (5 min)."""
-            if hasattr(self.orchestrator, 'execution'):
+            # Use orchestrator's fast_loop if available (PHASE 1)
+            if hasattr(self.orchestrator, 'fast_loop'):
+                self.orchestrator.fast_loop()
+            # Fallback to execution engine (PHASE 2+)
+            elif hasattr(self.orchestrator, 'execution'):
                 report = self.orchestrator.execution.execute_cycle(cycle_type="fast")
                 return report
 
