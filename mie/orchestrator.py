@@ -47,6 +47,7 @@ from mie.command_handler import CommandHandler
 from mie.state_cache import MIEStateCache
 from mie.pattern_detector import PatternDetector
 from mie.hypothesis_generator import HypothesisGenerator
+from mie.backtester_real import RealHypothesisBacktester
 
 
 class MIEOrchestrator:
@@ -67,9 +68,10 @@ class MIEOrchestrator:
         self.reporter = Reporter(telegram_token, telegram_chat_id)
         self.cache = MIEStateCache(logger=self.logger)
         self.dialogue = DialogueHandler(self.db, self.logger, cache=self.cache)
-        self.commands = CommandHandler(self.db, self.logger, cache=self.cache)
         self.pattern_detector = PatternDetector(logger=self.logger)
         self.hypothesis_generator = HypothesisGenerator(logger=self.logger)
+        self.backtester_real = RealHypothesisBacktester(db=self.db, logger=self.logger)
+        self.commands = CommandHandler(self.db, self.logger, cache=self.cache)
 
         # Telegram config
         self.telegram_token = telegram_token
@@ -343,6 +345,23 @@ class MIEOrchestrator:
                         self.cache.set_active_hypotheses(hypotheses)
                         for hyp in hypotheses:
                             self.logger.info(f"💡 Hypothesis generated: {hyp['asset']} - {hyp['hypothesis']}")
+
+                            # BACKTEST HYPOTHESIS against real data (NIVEL 4)
+                            try:
+                                backtest_result = self.backtester_real.backtest_hypothesis(hyp, lookback_hours=168)
+                                if backtest_result:
+                                    self.logger.info(
+                                        f"  📊 Backtest: {backtest_result.total_trades} trades, "
+                                        f"WR={backtest_result.win_rate:.1%}, "
+                                        f"Score={backtest_result.backtest_score:.3f}"
+                                    )
+                                    # Store backtest score in hypothesis for confidence assessment
+                                    hyp['backtest_score'] = backtest_result.backtest_score
+                                    hyp['win_rate'] = backtest_result.win_rate
+                                else:
+                                    self.logger.debug(f"  ⚠️  Backtest inconclusive (insufficient data)")
+                            except Exception as be:
+                                self.logger.debug(f"  ⚠️  Backtest error (non-critical): {be}")
             except Exception as e:
                 self.logger.warning(f"⚠️  Cache/pattern update failed (non-critical): {e}")
 

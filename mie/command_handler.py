@@ -1,13 +1,15 @@
 """
-MIE Command Handler - NIVEL 1 Commands
-Handles: /status, /btc, /eth, /market, /what_are_you_seeing, /alerts, /diagnostic
+MIE Command Handler - NIVEL 1-4 Commands
+Handles: /status, /btc, /eth, /market, /what_are_you_seeing, /alerts, /diagnostic, /backtest
 Only uses data that exists in DB. No improvisation.
 Uses state_cache for fast responses.
+NIVEL 4: Real hypothesis backtesting with actual market data
 """
 
 import logging
 from typing import Optional, Dict, List
 from datetime import datetime
+from mie.backtester_real import RealHypothesisBacktester
 
 
 class CommandHandler:
@@ -23,6 +25,7 @@ class CommandHandler:
         self.db = db
         self.logger = logger or logging.getLogger("CommandHandler")
         self.cache = cache
+        self.backtester = RealHypothesisBacktester(db=db, logger=logger)
 
     def handle_command(self, message: str, user_id: str = "unknown") -> Optional[str]:
         """
@@ -50,10 +53,16 @@ class CommandHandler:
             return self._cmd_alerts()
         elif command == "/hypothesis":
             return self._cmd_hypothesis()
+        elif command == "/backtest":
+            # /backtest [hypothesis_id] - Test a specific hypothesis
+            if len(parts) > 1:
+                return self._cmd_backtest(parts[1])
+            else:
+                return self._cmd_backtest_latest()
         elif command == "/diagnostic":
             return self._cmd_diagnostic()
         else:
-            return f"❌ Comando desconocido: {command}\n\n📋 Disponibles:\n/status\n/btc\n/eth\n/market\n/alerts\n/hypothesis\n/what_are_you_seeing\n/diagnostic"
+            return f"❌ Comando desconocido: {command}\n\n📋 Disponibles:\n/status\n/btc\n/eth\n/market\n/alerts\n/hypothesis\n/backtest\n/what_are_you_seeing\n/diagnostic"
 
     def _cmd_status(self) -> str:
         """Return system status - do we have recent data?"""
@@ -371,3 +380,90 @@ class CommandHandler:
         except Exception as e:
             self.logger.error(f"Error in /diagnostic: {e}")
             return f"❌ Error en diagnostic: {e}"
+
+    def _cmd_backtest_latest(self) -> str:
+        """Backtest the latest active hypothesis (NIVEL 4 - REAL DATA)."""
+        try:
+            if not self.cache or not self.cache.active_hypotheses:
+                return (
+                    f"📊 HYPOTHESIS BACKTESTER (NIVEL 4)\n"
+                    f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                    f"❌ No hypotheses to backtest\n"
+                    f"Usage: /backtest [hypothesis_id] or /backtest (uses latest)\n"
+                    f"\n📌 The backtester tests hypotheses against REAL historical data\n"
+                    f"from the database (no simulation, no random numbers)."
+                )
+
+            # Get the latest hypothesis
+            latest_hyp = self.cache.active_hypotheses[-1]
+            return self._backtest_hypothesis(latest_hyp)
+
+        except Exception as e:
+            self.logger.error(f"Error in /backtest: {e}")
+            return f"❌ Error en backtest: {e}"
+
+    def _cmd_backtest(self, hypothesis_id: str) -> str:
+        """Backtest a specific hypothesis by ID (NIVEL 4 - REAL DATA)."""
+        try:
+            if not self.cache or not self.cache.active_hypotheses:
+                return "❌ No hypotheses available to backtest"
+
+            # Find hypothesis by ID
+            target_hyp = None
+            for hyp in self.cache.active_hypotheses:
+                if hyp.get("id") == hypothesis_id:
+                    target_hyp = hyp
+                    break
+
+            if not target_hyp:
+                return f"❌ Hypothesis {hypothesis_id} not found in active hypotheses"
+
+            return self._backtest_hypothesis(target_hyp)
+
+        except Exception as e:
+            self.logger.error(f"Error in /backtest: {e}")
+            return f"❌ Error en backtest: {e}"
+
+    def _backtest_hypothesis(self, hypothesis: Dict) -> str:
+        """Run backtest using RealHypothesisBacktester."""
+        try:
+            # Run backtest on 1 week of historical data
+            result = self.backtester.backtest_hypothesis(hypothesis, lookback_hours=168)
+
+            if not result:
+                return (
+                    f"⚠️  BACKTEST RESULT\n"
+                    f"━━━━━━━━━━━━━━━━━━━━\n"
+                    f"❌ Insufficient data to backtest\n"
+                    f"Need at least 10 observations, have {len(self.db.get_observations(hypothesis.get('asset', 'BTC'), lookback_hours=168))}\n"
+                    f"\nWait for more market data to accumulate..."
+                )
+
+            # Format the report
+            report = self.backtester.format_backtest_report(result)
+
+            # Add interpretation
+            if result.win_rate >= 0.60:
+                verdict = "✅ STRONG - Hypothesis shows statistical edge"
+            elif result.win_rate >= 0.50:
+                verdict = "⚠️  MODERATE - Breakeven or slight edge"
+            else:
+                verdict = "❌ WEAK - Hypothesis underperformed"
+
+            report += f"\n{verdict}\n"
+
+            # Add backtest score interpretation
+            if result.backtest_score >= 0.65:
+                confidence = "HIGH - Confidence in this pattern"
+            elif result.backtest_score >= 0.50:
+                confidence = "MEDIUM - Further validation needed"
+            else:
+                confidence = "LOW - Needs more testing"
+
+            report += f"Confidence: {confidence}\n"
+
+            return report
+
+        except Exception as e:
+            self.logger.error(f"Error backtesting hypothesis: {e}")
+            return f"❌ Backtest error: {e}"
