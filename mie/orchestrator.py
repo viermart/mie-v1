@@ -323,13 +323,6 @@ class MIEOrchestrator:
                 except Exception as e:
                     self.logger.error(f"❌ Error ingesting {asset}: {e}")
 
-            # Detecta si hay oportunidad de generar nuevas hipótesis
-            # (basado en 2+ observaciones de mismo tipo para mismo asset)
-            try:
-                self.research.check_hypothesis_triggers()
-            except Exception as e:
-                self.logger.warning(f"⚠️  Research hypothesis check failed (non-critical): {e}")
-
             # UPDATE STATE CACHE with latest observations
             try:
                 btc_obs = self.db.get_observations(asset="BTC", lookback_hours=24, observation_type="price")
