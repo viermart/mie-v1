@@ -52,6 +52,8 @@ from mie.decision_registry import DecisionRegistry
 from mie.adaptive_feedback import AdaptiveFeedbackEngine
 from mie.risk_manager import RiskManager
 from mie.ml_engine import MLEngine
+from mie.status_dashboard import StatusDashboard
+from mie.http_server import start_server
 
 
 class MIEOrchestrator:
@@ -80,6 +82,9 @@ class MIEOrchestrator:
         self.risk_manager = RiskManager(decision_registry=self.decision_registry, logger=self.logger)
         self.ml_engine = MLEngine(decision_registry=self.decision_registry, logger=self.logger)
         self.commands = CommandHandler(self.db, self.logger, cache=self.cache, decision_registry=self.decision_registry, adaptive_feedback=self.adaptive_feedback, risk_manager=self.risk_manager, ml_engine=self.ml_engine)
+
+        # Status dashboard - generates HTML status page
+        self.dashboard = StatusDashboard(self.db, self.decision_registry, self.logger)
 
         # Telegram config
         self.telegram_token = telegram_token
@@ -400,6 +405,12 @@ class MIEOrchestrator:
                                 hyp['alert_approved'] = True  # Default to alert if feedback fails
             except Exception as e:
                 self.logger.warning(f"⚠️  Cache/pattern update failed (non-critical): {e}")
+
+            # Update HTML status dashboard
+            try:
+                self.dashboard.save()
+            except Exception as e:
+                self.logger.debug(f"Dashboard update error (non-critical): {e}")
 
             self.logger.info("✅ FAST LOOP completado")
 
@@ -802,6 +813,13 @@ class MIEOrchestrator:
         self.logger.info(f"   Assets: {self.assets}")
         self.logger.info(f"   DB: {self.db.db_path}")
         sys_module.stdout.flush()
+
+        # Start HTTP server for status dashboard
+        try:
+            start_server(port=8000, logger=self.logger)
+            self.logger.info("✅ HTTP server started - access dashboard at http://localhost:8000")
+        except Exception as e:
+            self.logger.warning(f"⚠️  Failed to start HTTP server: {e}")
 
         self.schedule_loops()
         sys_module.stdout.flush()
