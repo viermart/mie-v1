@@ -15,16 +15,18 @@ from mie.backtester_real import RealHypothesisBacktester
 class CommandHandler:
     """Process MIE commands and return real data from DB."""
 
-    def __init__(self, db, logger: Optional[logging.Logger] = None, cache=None):
+    def __init__(self, db, logger: Optional[logging.Logger] = None, cache=None, decision_registry=None):
         """
         Args:
             db: MIEDatabase instance
             logger: Logger instance
             cache: MIEStateCache instance (optional)
+            decision_registry: DecisionRegistry instance (optional, for NIVEL 5)
         """
         self.db = db
         self.logger = logger or logging.getLogger("CommandHandler")
         self.cache = cache
+        self.decision_registry = decision_registry
         self.backtester = RealHypothesisBacktester(db=db, logger=logger)
 
     def handle_command(self, message: str, user_id: str = "unknown") -> Optional[str]:
@@ -59,10 +61,13 @@ class CommandHandler:
                 return self._cmd_backtest(parts[1])
             else:
                 return self._cmd_backtest_latest()
+        elif command == "/validation":
+            # /validation - Show decision validation metrics (NIVEL 5)
+            return self._cmd_validation()
         elif command == "/diagnostic":
             return self._cmd_diagnostic()
         else:
-            return f"❌ Comando desconocido: {command}\n\n📋 Disponibles:\n/status\n/btc\n/eth\n/market\n/alerts\n/hypothesis\n/backtest\n/what_are_you_seeing\n/diagnostic"
+            return f"❌ Comando desconocido: {command}\n\n📋 Disponibles:\n/status\n/btc\n/eth\n/market\n/alerts\n/hypothesis\n/backtest\n/validation\n/what_are_you_seeing\n/diagnostic"
 
     def _cmd_status(self) -> str:
         """Return system status - do we have recent data?"""
@@ -467,3 +472,24 @@ class CommandHandler:
         except Exception as e:
             self.logger.error(f"Error backtesting hypothesis: {e}")
             return f"❌ Backtest error: {e}"
+
+    def _cmd_validation(self) -> str:
+        """
+        Show validation metrics from decision registry (NIVEL 5).
+        Displays accuracy, coherence, and false alert rate.
+        """
+        try:
+            if not self.decision_registry:
+                return (
+                    f"📊 VALIDATION REPORT (NIVEL 5)\n"
+                    f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                    f"⏳ Decision registry not initialized\n"
+                    f"Waiting for first decisions to be recorded..."
+                )
+
+            # Get validation metrics from registry
+            return self.decision_registry.format_validation_report()
+
+        except Exception as e:
+            self.logger.error(f"Error in /validation: {e}")
+            return f"❌ Error en validation: {e}"

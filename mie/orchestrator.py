@@ -48,6 +48,7 @@ from mie.state_cache import MIEStateCache
 from mie.pattern_detector import PatternDetector
 from mie.hypothesis_generator import HypothesisGenerator
 from mie.backtester_real import RealHypothesisBacktester
+from mie.decision_registry import DecisionRegistry
 
 
 class MIEOrchestrator:
@@ -71,7 +72,8 @@ class MIEOrchestrator:
         self.pattern_detector = PatternDetector(logger=self.logger)
         self.hypothesis_generator = HypothesisGenerator(logger=self.logger)
         self.backtester_real = RealHypothesisBacktester(db=self.db, logger=self.logger)
-        self.commands = CommandHandler(self.db, self.logger, cache=self.cache)
+        self.decision_registry = DecisionRegistry(db=self.db, logger=self.logger)
+        self.commands = CommandHandler(self.db, self.logger, cache=self.cache, decision_registry=self.decision_registry)
 
         # Telegram config
         self.telegram_token = telegram_token
@@ -347,6 +349,7 @@ class MIEOrchestrator:
                             self.logger.info(f"💡 Hypothesis generated: {hyp['asset']} - {hyp['hypothesis']}")
 
                             # BACKTEST HYPOTHESIS against real data (NIVEL 4)
+                            backtest_score = 0.0
                             try:
                                 backtest_result = self.backtester_real.backtest_hypothesis(hyp, lookback_hours=168)
                                 if backtest_result:
@@ -358,10 +361,24 @@ class MIEOrchestrator:
                                     # Store backtest score in hypothesis for confidence assessment
                                     hyp['backtest_score'] = backtest_result.backtest_score
                                     hyp['win_rate'] = backtest_result.win_rate
+                                    backtest_score = backtest_result.backtest_score
                                 else:
                                     self.logger.debug(f"  ⚠️  Backtest inconclusive (insufficient data)")
                             except Exception as be:
                                 self.logger.debug(f"  ⚠️  Backtest error (non-critical): {be}")
+
+                            # RECORD DECISION in registry (NIVEL 5)
+                            try:
+                                decision_id = self.decision_registry.record_hypothesis_decision(
+                                    hyp, self.cache, backtest_score
+                                )
+                                if decision_id:
+                                    hyp['decision_id'] = decision_id  # Link hypothesis to decision for outcome tracking
+                                    self.logger.info(f"  📋 Decision recorded: {decision_id}")
+                                else:
+                                    self.logger.warning(f"  ⚠️  Failed to record decision for {hyp.get('asset')}")
+                            except Exception as de:
+                                self.logger.warning(f"  ⚠️  Decision registry error (non-critical): {de}")
             except Exception as e:
                 self.logger.warning(f"⚠️  Cache/pattern update failed (non-critical): {e}")
 
@@ -373,6 +390,107 @@ class MIEOrchestrator:
                 self.reporter.send_error(f"Fast loop error: {e}")
             except:
                 pass  # Silently ignore reporter errors in PHASE 1
+
+    def outcome_tracking_loop(self):
+        """
+        Ejecuta cada 5 min: Trackea outcomes de decisiones activas.
+        Revisa si hay outcomes pendientes de registrar (+1h, +4h, +24h).
+        """
+        try:
+            self.logger.debug("⏱️  OUTCOME TRACKING LOOP iniciando...")
+
+            # Obtiene últimas observaciones de precio para cada asset
+            price_obs = {}
+            for asset in self.assets:
+                obs = self.db.get_observations(
+                    asset=asset,
+                    lookback_hours=168,
+                    observation_type="price"
+                )
+                if obs:
+                    price_obs[asset] = sorted(obs, key=lambda x: x.get("timestamp", ""))
+
+            # Revisa decisiones activas y registra outcomes
+            for decision in self.decision_registry.active_decisions:
+                asset = decision.get("asset")
+                decision_timestamp = decision.get("timestamp")
+                decision_id = decision.get("decision_id")
+
+                if not asset or not decision_timestamp or not decision_id:
+                    continue
+
+                # Calcula tiempos para outcomes
+                from datetime import datetime as dt
+                decision_time = dt.fromisoformat(decision_timestamp)
+                now = dt.utcnow()
+
+                elapsed_hours = (now - decision_time).total_seconds() / 3600
+
+                # Entry price from decision snapshot
+                entry_price = decision.get("state_snapshot", {}).get("current_price", 0)
+                if not entry_price or entry_price == 0:
+                    continue
+
+                # Obtén precios en +1h, +4h, +24h
+                if not decision.get("outcome_1h") and elapsed_hours >= 1.0:
+                    # Busca observación cercana a +1h
+                    target_time = decision_time + timedelta(hours=1)
+                    closest_obs = self._find_closest_observation(price_obs[asset], target_time)
+                    if closest_obs:
+                        self.decision_registry.record_outcome_1h(
+                            decision_id,
+                            closest_obs["value"],
+                            entry_price
+                        )
+                        self.logger.debug(f"  ✅ Outcome +1h recorded for {decision_id}")
+
+                if not decision.get("outcome_4h") and elapsed_hours >= 4.0:
+                    target_time = decision_time + timedelta(hours=4)
+                    closest_obs = self._find_closest_observation(price_obs[asset], target_time)
+                    if closest_obs:
+                        self.decision_registry.record_outcome_4h(
+                            decision_id,
+                            closest_obs["value"],
+                            entry_price
+                        )
+                        self.logger.debug(f"  ✅ Outcome +4h recorded for {decision_id}")
+
+                if not decision.get("outcome_24h") and elapsed_hours >= 24.0:
+                    target_time = decision_time + timedelta(hours=24)
+                    closest_obs = self._find_closest_observation(price_obs[asset], target_time)
+                    if closest_obs:
+                        self.decision_registry.record_outcome_24h(
+                            decision_id,
+                            closest_obs["value"],
+                            entry_price
+                        )
+                        self.logger.debug(f"  ✅ Outcome +24h recorded for {decision_id}")
+
+            self.logger.debug(f"⏱️  Outcome tracking: {len(self.decision_registry.active_decisions)} active decisions")
+
+        except Exception as e:
+            self.logger.warning(f"⚠️  Outcome tracking error (non-critical): {e}")
+
+    def _find_closest_observation(self, obs_list: List[Dict], target_time: datetime) -> Optional[Dict]:
+        """Busca la observación más cercana a target_time"""
+        if not obs_list:
+            return None
+
+        from datetime import datetime as dt
+        closest = None
+        min_diff = float('inf')
+
+        for obs in obs_list:
+            try:
+                obs_time = dt.fromisoformat(obs.get("timestamp", ""))
+                diff = abs((obs_time - target_time).total_seconds())
+                if diff < min_diff:
+                    min_diff = diff
+                    closest = obs
+            except:
+                continue
+
+        return closest if min_diff < 3600 else None  # Max 1 hour difference
 
     def daily_loop(self):
         """Ejecuta a las 08:00 UTC: reflexion + investigacion + research layer"""
@@ -488,9 +606,12 @@ class MIEOrchestrator:
         return summary
 
     def schedule_loops(self):
-        """Configura schedule con tres ciclos"""
-        # Fast loop: cada 5 minutos (incluye chequeo de Telegram)
+        """Configura schedule con cuatro ciclos"""
+        # Fast loop: cada 5 minutos (incluye chequeo de Telegram + pattern detection + hypothesis generation)
         schedule.every(5).minutes.do(self.fast_loop)
+
+        # Outcome tracking loop: cada 5 minutos (trackea outcomes de decisiones activas)
+        schedule.every(5).minutes.do(self.outcome_tracking_loop)
 
         # Daily loop: 08:00 UTC
         schedule.every().day.at("08:00").do(self.daily_loop)
@@ -502,9 +623,11 @@ class MIEOrchestrator:
         schedule.every().day.at("18:00").do(self._check_monthly_schedule)
 
         self.logger.info("✅ Loops programados:")
-        self.logger.info("  - Fast: cada 5 minutos (incluye Telegram)")
+        self.logger.info("  - Fast: cada 5 minutos (ingesta + patrones + hipótesis)")
+        self.logger.info("  - Outcome tracking: cada 5 minutos (outcomes +1h/+4h/+24h)")
         self.logger.info("  - Daily: 08:00 UTC")
         self.logger.info("  - Weekly: domingo 08:00 UTC")
+        self.logger.info("  - Monthly: 1º de mes 18:00 UTC")
 
 
 
