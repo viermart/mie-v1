@@ -229,13 +229,21 @@ class MIEScheduler:
         # Fast loop: Market scanning and signal detection
         def fast_loop():
             """Fast loop: Scan market, detect signals (5 min)."""
-            # Use orchestrator's fast_loop if available (PHASE 1)
-            if hasattr(self.orchestrator, 'fast_loop'):
-                self.orchestrator.fast_loop()
-            # Fallback to execution engine (PHASE 2+)
-            elif hasattr(self.orchestrator, 'execution'):
-                report = self.orchestrator.execution.execute_cycle(cycle_type="fast")
-                return report
+            self.logger.info("🚀 FAST_LOOP EXECUTING - market observation cycle")
+            try:
+                # Use orchestrator's fast_loop if available (PHASE 1)
+                if hasattr(self.orchestrator, 'fast_loop'):
+                    self.logger.info("  → Using orchestrator.fast_loop()")
+                    self.orchestrator.fast_loop()
+                    self.logger.info("  ✅ fast_loop completed")
+                # Fallback to execution engine (PHASE 2+)
+                elif hasattr(self.orchestrator, 'execution'):
+                    self.logger.info("  → Using execution engine")
+                    report = self.orchestrator.execution.execute_cycle(cycle_type="fast")
+                    return report
+            except Exception as e:
+                self.logger.error(f"  ❌ fast_loop failed: {e}", exc_info=True)
+                return False
 
         # Daily loop: Deep analysis and hypothesis generation
         def daily_loop():
@@ -310,14 +318,24 @@ class MIEScheduler:
         self.scheduler.running = True
         print("✅ MIE Scheduler started")
         self.orchestrator.logger.info("✅ MIE Scheduler initialized - listening for Telegram messages")
+        self.orchestrator.logger.info(f"📋 Registered tasks: {list(self.scheduler.tasks.keys())}")
 
         # Counter para chequear mensajes de Telegram frecuentemente
         telegram_check_counter = 0
         telegram_check_interval = 3  # Chequea cada 3 segundos (más frecuente)
+        scheduler_cycle_counter = 0
 
         while self.scheduler.running:
             try:
+                # Log scheduler cycle every 30 seconds
+                scheduler_cycle_counter += 1
+                if scheduler_cycle_counter % 30 == 0:
+                    self.orchestrator.logger.info(f"🔄 Scheduler cycle running - checking {len(self.scheduler.tasks)} tasks")
+                    scheduler_cycle_counter = 0
+
                 # Ejecuta tareas programadas
+                pending_count = len(self.scheduler.scheduler.get_jobs())
+                self.orchestrator.logger.debug(f"Scheduler has {pending_count} jobs, running pending...")
                 self.scheduler.scheduler.run_pending()
 
                 # Chequea mensajes de Telegram regularmente
