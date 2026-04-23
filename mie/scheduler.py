@@ -320,6 +320,15 @@ class MIEScheduler:
         self.orchestrator.logger.info("✅ MIE Scheduler initialized - listening for Telegram messages")
         self.orchestrator.logger.info(f"📋 Registered tasks: {list(self.scheduler.tasks.keys())}")
 
+        # PHASE 1: Execute fast_loop IMMEDIATELY on startup
+        self.orchestrator.logger.info("🚀 BOOTSTRAP: Executing fast_loop immediately on startup (PHASE 1)")
+        try:
+            if hasattr(self.orchestrator, 'fast_loop'):
+                self.orchestrator.fast_loop()
+                self.orchestrator.logger.info("✅ BOOTSTRAP fast_loop completed")
+        except Exception as e:
+            self.orchestrator.logger.error(f"❌ BOOTSTRAP fast_loop failed: {e}", exc_info=True)
+
         # Counter para chequear mensajes de Telegram frecuentemente
         telegram_check_counter = 0
         telegram_check_interval = 3  # Chequea cada 3 segundos (más frecuente)
