@@ -123,6 +123,15 @@ class MIEOrchestrator:
         # Scheduler for periodic execution
         self.scheduler = MIEScheduler(self, logger=self.logger)
 
+        # Register fast_loop to run every 5 minutes
+        self.scheduler.register_fast_loop(
+            task_id="fast_loop_market_observation",
+            task_func=self.fast_loop,
+            description="Market observation and data ingestion",
+            interval_minutes=5
+        )
+        self.logger.info("✅ Registered fast_loop - runs every 5 minutes")
+
         # Assets a observar (V1)
         self.assets = ["BTC", "ETH"]
 
