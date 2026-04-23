@@ -45,6 +45,7 @@ from mie.scheduler import MIEScheduler
 from mie.dialogue import DialogueHandler
 from mie.command_handler import CommandHandler
 from mie.state_cache import MIEStateCache
+from mie.pattern_detector import PatternDetector
 
 
 class MIEOrchestrator:
@@ -66,6 +67,7 @@ class MIEOrchestrator:
         self.cache = MIEStateCache(logger=self.logger)
         self.dialogue = DialogueHandler(self.db, self.logger, cache=self.cache)
         self.commands = CommandHandler(self.db, self.logger, cache=self.cache)
+        self.pattern_detector = PatternDetector(logger=self.logger)
 
         # Telegram config
         self.telegram_token = telegram_token
@@ -321,8 +323,19 @@ class MIEOrchestrator:
                 btc_obs = self.db.get_observations(asset="BTC", lookback_hours=24, observation_type="price")
                 eth_obs = self.db.get_observations(asset="ETH", lookback_hours=24, observation_type="price")
                 self.cache.update_from_observations(btc_obs or [], eth_obs or [])
+
+                # DETECT PATTERNS in observations
+                asset_data = {
+                    "BTC": btc_obs or [],
+                    "ETH": eth_obs or []
+                }
+                patterns = self.pattern_detector.detect_all_patterns(asset_data)
+                if patterns:
+                    self.cache.set_detected_patterns(patterns)
+                    for pattern in patterns:
+                        self.logger.info(f"🔍 Pattern detected: {pattern['asset']} - {pattern['type']}")
             except Exception as e:
-                self.logger.warning(f"⚠️  Cache update failed (non-critical): {e}")
+                self.logger.warning(f"⚠️  Cache/pattern update failed (non-critical): {e}")
 
             self.logger.info("✅ FAST LOOP completado")
 

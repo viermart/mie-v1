@@ -36,6 +36,10 @@ class MIEStateCache:
         self.active_alerts = {}    # {asset: [alert_dict, ...]}
         self.last_alert_scan = None
 
+        # Patterns detected
+        self.detected_patterns = []  # List of pattern dicts
+        self.last_pattern_scan = None
+
     def update_from_observations(self, btc_obs_list: List[Dict], eth_obs_list: List[Dict]):
         """Update cache from latest observations from DB."""
         try:
@@ -157,6 +161,11 @@ class MIEStateCache:
         self.active_alerts[asset] = alerts
         self.last_alert_scan = datetime.utcnow().isoformat()
 
+    def set_detected_patterns(self, patterns: List[Dict]):
+        """Update detected patterns."""
+        self.detected_patterns = patterns
+        self.last_pattern_scan = datetime.utcnow().isoformat()
+
     def to_dict(self) -> Dict:
         """Export cache state as dict for debugging."""
         return {
@@ -181,4 +190,6 @@ class MIEStateCache:
             },
             "alerts": self.active_alerts,
             "last_alert_scan": self.last_alert_scan,
+            "patterns": self.detected_patterns,
+            "last_pattern_scan": self.last_pattern_scan,
         }

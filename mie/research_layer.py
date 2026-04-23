@@ -460,3 +460,21 @@ class ResearchLayer:
             "classifications_this_week": classifications,
             "latest_experiments": this_week[-3:]  # Last 3
         }
+
+    def check_hypothesis_triggers(self):
+        """
+        Check if we should trigger new hypothesis generation.
+        STUB for PHASE 1 - just pass.
+        In PHASE 2+, this would analyze market conditions.
+        """
+        try:
+            # Check if we have enough observations
+            btc_count = self.db.get_observation_count(asset="BTC")
+            eth_count = self.db.get_observation_count(asset="ETH")
+
+            if btc_count >= self.OBSERVATION_THRESHOLD and eth_count >= self.OBSERVATION_THRESHOLD:
+                # We have data, but don't generate hypotheses in PHASE 1
+                # Just log that triggers were checked
+                self.logger.debug(f"✓ Hypothesis trigger check: BTC={btc_count}, ETH={eth_count}")
+        except Exception as e:
+            self.logger.debug(f"Hypothesis trigger check (non-critical): {e}")
