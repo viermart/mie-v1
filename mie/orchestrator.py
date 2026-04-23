@@ -50,6 +50,7 @@ from mie.hypothesis_generator import HypothesisGenerator
 from mie.backtester_real import RealHypothesisBacktester
 from mie.decision_registry import DecisionRegistry
 from mie.adaptive_feedback import AdaptiveFeedbackEngine
+from mie.risk_manager import RiskManager
 
 
 class MIEOrchestrator:
@@ -75,7 +76,8 @@ class MIEOrchestrator:
         self.backtester_real = RealHypothesisBacktester(db=self.db, logger=self.logger)
         self.decision_registry = DecisionRegistry(db=self.db, logger=self.logger)
         self.adaptive_feedback = AdaptiveFeedbackEngine(decision_registry=self.decision_registry, logger=self.logger)
-        self.commands = CommandHandler(self.db, self.logger, cache=self.cache, decision_registry=self.decision_registry, adaptive_feedback=self.adaptive_feedback)
+        self.risk_manager = RiskManager(decision_registry=self.decision_registry, logger=self.logger)
+        self.commands = CommandHandler(self.db, self.logger, cache=self.cache, decision_registry=self.decision_registry, adaptive_feedback=self.adaptive_feedback, risk_manager=self.risk_manager)
 
         # Telegram config
         self.telegram_token = telegram_token

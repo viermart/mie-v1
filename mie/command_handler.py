@@ -13,12 +13,13 @@ from typing import Optional, Dict, List
 from datetime import datetime
 from mie.backtester_real import RealHypothesisBacktester
 from mie.adaptive_feedback import AdaptiveFeedbackEngine
+from mie.risk_manager import RiskManager
 
 
 class CommandHandler:
     """Process MIE commands and return real data from DB."""
 
-    def __init__(self, db, logger: Optional[logging.Logger] = None, cache=None, decision_registry=None, adaptive_feedback=None):
+    def __init__(self, db, logger: Optional[logging.Logger] = None, cache=None, decision_registry=None, adaptive_feedback=None, risk_manager=None):
         """
         Args:
             db: MIEDatabase instance
@@ -26,12 +27,14 @@ class CommandHandler:
             cache: MIEStateCache instance (optional)
             decision_registry: DecisionRegistry instance (optional, for NIVEL 5)
             adaptive_feedback: AdaptiveFeedbackEngine instance (optional, for NIVEL 6)
+            risk_manager: RiskManager instance (optional, for NIVEL 7)
         """
         self.db = db
         self.logger = logger or logging.getLogger("CommandHandler")
         self.cache = cache
         self.decision_registry = decision_registry
         self.adaptive_feedback = adaptive_feedback
+        self.risk_manager = risk_manager
         self.backtester = RealHypothesisBacktester(db=db, logger=logger)
 
     def handle_command(self, message: str, user_id: str = "unknown") -> Optional[str]:
@@ -72,10 +75,13 @@ class CommandHandler:
         elif command == "/adaptive":
             # /adaptive - Show adaptive feedback status (NIVEL 6)
             return self._cmd_adaptive()
+        elif command == "/risk":
+            # /risk - Show risk management metrics (NIVEL 7)
+            return self._cmd_risk()
         elif command == "/diagnostic":
             return self._cmd_diagnostic()
         else:
-            return f"❌ Comando desconocido: {command}\n\n📋 Disponibles:\n/status\n/btc\n/eth\n/market\n/alerts\n/hypothesis\n/backtest\n/validation\n/adaptive\n/what_are_you_seeing\n/diagnostic"
+            return f"❌ Comando desconocido: {command}\n\n📋 Disponibles:\n/status\n/btc\n/eth\n/market\n/alerts\n/hypothesis\n/backtest\n/validation\n/adaptive\n/risk\n/what_are_you_seeing\n/diagnostic"
 
     def _cmd_status(self) -> str:
         """Return system status - do we have recent data?"""
@@ -525,3 +531,27 @@ class CommandHandler:
         except Exception as e:
             self.logger.error(f"Error in /adaptive: {e}")
             return f"❌ Error en adaptive: {e}"
+
+    def _cmd_risk(self) -> str:
+        """
+        Show risk management metrics (NIVEL 7).
+        Displays Sharpe ratio, max drawdown, position sizing per hypothesis type.
+        """
+        try:
+            if not self.risk_manager:
+                return (
+                    f"⚠️  RISK MANAGEMENT (NIVEL 7)\n"
+                    f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                    f"⏳ Risk manager not initialized\n"
+                    f"Waiting for first decisions to be recorded..."
+                )
+
+            # Analyze risk metrics
+            self.risk_manager.analyze_risk_metrics()
+
+            # Return risk report
+            return self.risk_manager.format_risk_report()
+
+        except Exception as e:
+            self.logger.error(f"Error in /risk: {e}")
+            return f"❌ Error en risk: {e}"
