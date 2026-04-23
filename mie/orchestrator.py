@@ -64,7 +64,7 @@ class MIEOrchestrator:
         self.research = ResearchLayer(self.db)
         self.reporter = Reporter(telegram_token, telegram_chat_id)
         self.cache = MIEStateCache(logger=self.logger)
-        self.dialogue = DialogueHandler(self.db, self.logger)
+        self.dialogue = DialogueHandler(self.db, self.logger, cache=self.cache)
         self.commands = CommandHandler(self.db, self.logger, cache=self.cache)
 
         # Telegram config
