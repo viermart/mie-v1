@@ -178,24 +178,35 @@ class CommandHandler:
             eth_count = self.db.get_observation_count(asset="ETH")
             btc_recent = self.db.get_observations(asset="BTC", lookback_hours=1, observation_type="price")
             eth_recent = self.db.get_observations(asset="ETH", lookback_hours=1, observation_type="price")
+            btc_all = self.db.get_observations(asset="BTC", lookback_hours=24, observation_type="price")
+            eth_all = self.db.get_observations(asset="ETH", lookback_hours=24, observation_type="price")
 
             diagnosis = "🔍 DIAGNOSTIC REPORT\n"
             diagnosis += "━━━━━━━━━━━━━━━━━━\n"
             diagnosis += f"✅ Code version: 20260422-BINANCE-FIX\n"
             diagnosis += f"📊 Total observations: BTC={btc_count}, ETH={eth_count}\n"
             diagnosis += f"📊 Recent (< 1h): BTC={len(btc_recent or [])}, ETH={len(eth_recent or [])}\n"
+            diagnosis += f"📊 Last 24h: BTC={len(btc_all or [])}, ETH={len(eth_all or [])}\n"
 
             if btc_count == 0:
                 diagnosis += "\n❌ ISSUE: No observations at all - fast_loop never ran"
+            elif not btc_recent and not btc_all:
+                diagnosis += "\n❌ ISSUE: No data at all"
             elif not btc_recent:
-                diagnosis += "\n⚠️  ISSUE: Data exists but all older than 1h - fast_loop not running regularly"
+                if btc_all and btc_all[-1]:
+                    latest = btc_all[-1]
+                    diagnosis += f"\n⚠️  ISSUE: Data exists but all older than 1h"
+                    diagnosis += f"\n  Last BTC: ${latest.get('value', 0):,.2f} @ {latest.get('timestamp', 'unknown')[-5:]}"
             elif btc_recent and btc_recent[-1].get('value', 0) == 0:
                 diagnosis += "\n⚠️  ISSUE: Recent data shows $0 - Binance fetch failing"
             else:
                 diagnosis += "\n✅ STATUS: Everything OK - data flowing"
                 if btc_recent and btc_recent[-1]:
                     latest_btc = btc_recent[-1]
-                    diagnosis += f"\n  Latest BTC: ${latest_btc.get('value', 0):,.2f}"
+                    diagnosis += f"\n  Latest BTC: ${latest_btc.get('value', 0):,.2f} @ {latest_btc.get('timestamp', 'unknown')[-5:]}"
+                if eth_recent and eth_recent[-1]:
+                    latest_eth = eth_recent[-1]
+                    diagnosis += f"\n  Latest ETH: ${latest_eth.get('value', 0):,.2f} @ {latest_eth.get('timestamp', 'unknown')[-5:]}"
 
             return diagnosis
 
