@@ -787,12 +787,22 @@ class MIEOrchestrator:
 
     def run(self):
         """Loop principal: ejecuta scheduler"""
+        import sys as sys_module
+
         self.running = True
         self.logger.info("🚀 MIE V1 iniciando...")
         self.logger.info(f"   Assets: {self.assets}")
         self.logger.info(f"   DB: {self.db.db_path}")
+        sys_module.stdout.flush()
 
         self.schedule_loops()
+        sys_module.stdout.flush()
+
+        # EJECUTA FAST LOOP INMEDIATAMENTE para verificar que funciona
+        self.logger.info("\n⚡ Ejecutando fast_loop inicial...\n")
+        sys_module.stdout.flush()
+        self.fast_loop()
+        sys_module.stdout.flush()
 
         # Envía heartbeat inicial
         self.reporter.send_heartbeat("MIE V1 iniciado correctamente")
