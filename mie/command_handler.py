@@ -48,10 +48,12 @@ class CommandHandler:
             return self._cmd_what_seeing()
         elif command == "/alerts":
             return self._cmd_alerts()
+        elif command == "/hypothesis":
+            return self._cmd_hypothesis()
         elif command == "/diagnostic":
             return self._cmd_diagnostic()
         else:
-            return f"❌ Comando desconocido: {command}\n\n📋 Disponibles:\n/status\n/btc\n/eth\n/market\n/alerts\n/what_are_you_seeing\n/diagnostic"
+            return f"❌ Comando desconocido: {command}\n\n📋 Disponibles:\n/status\n/btc\n/eth\n/market\n/alerts\n/hypothesis\n/what_are_you_seeing\n/diagnostic"
 
     def _cmd_status(self) -> str:
         """Return system status - do we have recent data?"""
@@ -288,6 +290,44 @@ class CommandHandler:
         except Exception as e:
             self.logger.error(f"Error in /alerts: {e}")
             return f"❌ Error obteniendo alerts: {e}"
+
+    def _cmd_hypothesis(self) -> str:
+        """Show active hypotheses (NIVEL 3)."""
+        try:
+            if not self.cache:
+                return "⚠️  Hypothesis system not initialized yet."
+
+            hypotheses = self.cache.active_hypotheses or []
+
+            if not hypotheses:
+                return (
+                    f"💡 ACTIVE HYPOTHESES\n"
+                    f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                    f"✅ No hypotheses yet\n"
+                    f"(Generated when patterns detected)\n"
+                    f"Last generation: {self.cache.last_hypothesis_generation or 'never'}"
+                )
+
+            hyp_text = f"💡 ACTIVE HYPOTHESES ({len(hypotheses)} total)\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+
+            for hyp in hypotheses:
+                asset = hyp.get("asset", "?")
+                hid = hyp.get("id", "?")
+                hypothesis = hyp.get("hypothesis", "?")
+                outcome = hyp.get("expected_outcome", "?")
+                confidence = hyp.get("confidence", "?")
+
+                hyp_text += f"\n📌 {hid} - {asset}\n"
+                hyp_text += f"   {hypothesis}\n"
+                hyp_text += f"   Expected: {outcome}\n"
+                hyp_text += f"   Confidence: {confidence}\n"
+
+            hyp_text += f"\n⏰ Generated: {self.cache.last_hypothesis_generation or 'never'}"
+            return hyp_text
+
+        except Exception as e:
+            self.logger.error(f"Error in /hypothesis: {e}")
+            return f"❌ Error obteniendo hypotheses: {e}"
 
     def _cmd_diagnostic(self) -> str:
         """Deployment diagnostic - check if code and data are in sync."""

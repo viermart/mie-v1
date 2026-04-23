@@ -46,6 +46,7 @@ from mie.dialogue import DialogueHandler
 from mie.command_handler import CommandHandler
 from mie.state_cache import MIEStateCache
 from mie.pattern_detector import PatternDetector
+from mie.hypothesis_generator import HypothesisGenerator
 
 
 class MIEOrchestrator:
@@ -68,6 +69,7 @@ class MIEOrchestrator:
         self.dialogue = DialogueHandler(self.db, self.logger, cache=self.cache)
         self.commands = CommandHandler(self.db, self.logger, cache=self.cache)
         self.pattern_detector = PatternDetector(logger=self.logger)
+        self.hypothesis_generator = HypothesisGenerator(logger=self.logger)
 
         # Telegram config
         self.telegram_token = telegram_token
@@ -334,6 +336,13 @@ class MIEOrchestrator:
                     self.cache.set_detected_patterns(patterns)
                     for pattern in patterns:
                         self.logger.info(f"🔍 Pattern detected: {pattern['asset']} - {pattern['type']}")
+
+                    # GENERATE HYPOTHESES from patterns
+                    hypotheses = self.hypothesis_generator.generate_from_patterns(patterns)
+                    if hypotheses:
+                        self.cache.set_active_hypotheses(hypotheses)
+                        for hyp in hypotheses:
+                            self.logger.info(f"💡 Hypothesis generated: {hyp['asset']} - {hyp['hypothesis']}")
             except Exception as e:
                 self.logger.warning(f"⚠️  Cache/pattern update failed (non-critical): {e}")
 
