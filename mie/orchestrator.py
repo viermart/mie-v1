@@ -302,13 +302,19 @@ class MIEOrchestrator:
 
             # Detecta si hay oportunidad de generar nuevas hipótesis
             # (basado en 2+ observaciones de mismo tipo para mismo asset)
-            self.research.check_hypothesis_triggers()
+            try:
+                self.research.check_hypothesis_triggers()
+            except Exception as e:
+                self.logger.warning(f"⚠️  Research hypothesis check failed (non-critical): {e}")
 
             self.logger.info("✅ FAST LOOP completado")
 
         except Exception as e:
-            self.logger.error(f"FAST LOOP error: {e}")
-            self.reporter.send_error(f"Fast loop error: {e}")
+            self.logger.error(f"FAST LOOP error: {e}", exc_info=True)
+            try:
+                self.reporter.send_error(f"Fast loop error: {e}")
+            except:
+                pass  # Silently ignore reporter errors in PHASE 1
 
     def daily_loop(self):
         """Ejecuta a las 08:00 UTC: reflexion + investigacion + research layer"""
