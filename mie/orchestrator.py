@@ -219,9 +219,11 @@ class MIEOrchestrator:
                     self.logger.error(f"Error procesando update {update.get('update_id')}: {e}", exc_info=True)
 
         except requests.RequestException as e:
-            self.logger.error(f"Error checking Telegram messages: {e}", exc_info=True)
+            self.logger.warning(f"⚠️  Telegram error (non-critical): {e}")
+            # Don't crash on Telegram errors - continue with fast_loop
         except Exception as e:
-            self.logger.error(f"Error en _check_telegram_messages: {e}", exc_info=True)
+            self.logger.warning(f"⚠️  _check_telegram_messages error (non-critical): {e}")
+            # Don't crash on Telegram errors - continue with fast_loop
 
     def _send_telegram_message(self, text: str, use_markdown: bool = True):
         """Envía un mensaje a Telegram. Convierte dicts a string si es necesario."""
@@ -284,6 +286,12 @@ class MIEOrchestrator:
                     self.logger.debug(f"  → Fetching {asset} from Binance...")
                     # Obtiene datos crudos de Binance
                     raw_obs = self.binance.ingest_observation(asset)
+
+                    # Si Binance está bloqueado, continúa con el próximo asset
+                    if raw_obs is None:
+                        self.logger.warning(f"⚠️  No data for {asset}, skipping...")
+                        continue
+
                     self.logger.debug(f"    ✅ Raw data received: {raw_obs.get('asset')} @ {raw_obs.get('timestamp')}")
 
                     parsed = self.binance.parse_observation(raw_obs)
