@@ -12,7 +12,13 @@ VERSION: 2.2 - Railway Redeploy with Claude API
 import os
 import sys
 from pathlib import Path
-from dotenv import load_dotenv
+
+# Try to load .env if available (optional - Railway injects variables directly)
+try:
+    from dotenv import load_dotenv
+    DOTENV_AVAILABLE = True
+except ImportError:
+    DOTENV_AVAILABLE = False
 
 # Añade mie al path
 sys.path.insert(0, str(Path(__file__).parent))
@@ -27,8 +33,9 @@ def main():
     setup_env_file()
 
     # SEGUNDO: Carga variables de entorno desde el .env generado - ANTES de imports que las usen
+    # (solo si dotenv está disponible - en Railway las variables ya están inyectadas)
     env_path = Path(__file__).parent / ".env"
-    if env_path.exists():
+    if DOTENV_AVAILABLE and env_path.exists():
         load_dotenv(env_path, override=True)
         print("✅ Archivo .env cargado correctamente")
         # Verificar que las variables están disponibles
@@ -36,7 +43,7 @@ def main():
         print(f"  • TELEGRAM_TOKEN: {'✅' if os.getenv('TELEGRAM_TOKEN') else '❌'}")
         print(f"  • TELEGRAM_CHAT_ID: {'✅' if os.getenv('TELEGRAM_CHAT_ID') else '❌'}")
     else:
-        print("⚠️  .env no encontrado - usando solo variables de entorno del sistema")
+        print("ℹ️  Usando variables de entorno del sistema (Railway injection o local env)")
 
     # TERCERO: Validar variables de entorno después de cargarlas
     if not validate_env():

@@ -25,6 +25,5 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD python -c "import sys; sys.exit(0)" || exit 1
 
-# Start bot
-# Build timestamp: 2026-04-22 20:28 - Force rebuild to clear old container instances
-CMD ["python", "-m", "mie.main", "scheduler"]
+# Start bot - single entrypoint
+CMD ["python", "main.py"]

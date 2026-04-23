@@ -8,7 +8,9 @@ import os
 from pathlib import Path
 
 def setup_env_file():
-    """Create .env file from environment variables."""
+    """Create .env file from environment variables.
+    ALWAYS regenerate - this ensures Railway's injected variables are used.
+    """
     env_path = Path(__file__).parent / ".env"
 
     # Variables a copiar desde el entorno
@@ -22,11 +24,7 @@ def setup_env_file():
         "PORT"
     ]
 
-    # Si ya existe .env, no lo sobreescribimos
-    if env_path.exists():
-        return
-
-    # Crear .env con las variables disponibles
+    # Crear .env con las variables disponibles (SIEMPRE, para que Railway pueda inyectar)
     env_content = "# MIE V1 - Generated at runtime\n\n"
 
     for var in vars_to_copy:
@@ -37,7 +35,7 @@ def setup_env_file():
     if env_content.count("\n") > 2:
         # Solo escribir si hay variables reales
         env_path.write_text(env_content)
-        print(f"✅ Archivo .env generado con {len([v for v in vars_to_copy if os.getenv(v)])} variables")
+        print(f"✅ Archivo .env regenerado con {len([v for v in vars_to_copy if os.getenv(v)])} variables")
     else:
         print("ℹ️  No hay variables de entorno para generar .env")
 

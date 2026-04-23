@@ -2,7 +2,7 @@
 builder = "dockerfile"
 
 [deploy]
-startCommand = "python -m mie.main scheduler"
+startCommand = "python main.py"
 restartPolicyType = "always"
 restartPolicyMaxRetries = 5
 
