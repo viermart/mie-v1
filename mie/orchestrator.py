@@ -44,6 +44,7 @@ from mie.execution_engine import ExecutionEngine
 from mie.scheduler import MIEScheduler
 from mie.dialogue import DialogueHandler
 from mie.command_handler import CommandHandler
+from mie.state_cache import MIEStateCache
 
 
 class MIEOrchestrator:
@@ -62,8 +63,9 @@ class MIEOrchestrator:
         self.binance = BinanceClient()
         self.research = ResearchLayer(self.db)
         self.reporter = Reporter(telegram_token, telegram_chat_id)
+        self.cache = MIEStateCache(logger=self.logger)
         self.dialogue = DialogueHandler(self.db, self.logger)
-        self.commands = CommandHandler(self.db, self.logger)
+        self.commands = CommandHandler(self.db, self.logger, cache=self.cache)
 
         # Telegram config
         self.telegram_token = telegram_token
@@ -313,6 +315,14 @@ class MIEOrchestrator:
                 self.research.check_hypothesis_triggers()
             except Exception as e:
                 self.logger.warning(f"⚠️  Research hypothesis check failed (non-critical): {e}")
+
+            # UPDATE STATE CACHE with latest observations
+            try:
+                btc_obs = self.db.get_observations(asset="BTC", lookback_hours=24, observation_type="price")
+                eth_obs = self.db.get_observations(asset="ETH", lookback_hours=24, observation_type="price")
+                self.cache.update_from_observations(btc_obs or [], eth_obs or [])
+            except Exception as e:
+                self.logger.warning(f"⚠️  Cache update failed (non-critical): {e}")
 
             self.logger.info("✅ FAST LOOP completado")
 

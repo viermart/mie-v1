@@ -1,25 +1,28 @@
 """
-MIE Command Handler - FASE 1 Minimal Commands
-Handles: /status, /btc, /eth, /market, /what_are_you_seeing
+MIE Command Handler - NIVEL 1 Commands
+Handles: /status, /btc, /eth, /market, /what_are_you_seeing, /alerts, /diagnostic
 Only uses data that exists in DB. No improvisation.
+Uses state_cache for fast responses.
 """
 
 import logging
-from typing import Optional, Dict
+from typing import Optional, Dict, List
 from datetime import datetime
 
 
 class CommandHandler:
     """Process MIE commands and return real data from DB."""
 
-    def __init__(self, db, logger: Optional[logging.Logger] = None):
+    def __init__(self, db, logger: Optional[logging.Logger] = None, cache=None):
         """
         Args:
             db: MIEDatabase instance
             logger: Logger instance
+            cache: MIEStateCache instance (optional)
         """
         self.db = db
         self.logger = logger or logging.getLogger("CommandHandler")
+        self.cache = cache
 
     def handle_command(self, message: str, user_id: str = "unknown") -> Optional[str]:
         """
@@ -43,10 +46,12 @@ class CommandHandler:
             return self._cmd_market()
         elif command == "/what_are_you_seeing":
             return self._cmd_what_seeing()
+        elif command == "/alerts":
+            return self._cmd_alerts()
         elif command == "/diagnostic":
             return self._cmd_diagnostic()
         else:
-            return f"Comando desconocido: {command}\nDisponibles: /status, /btc, /eth, /market, /what_are_you_seeing, /diagnostic"
+            return f"❌ Comando desconocido: {command}\n\n📋 Disponibles:\n/status\n/btc\n/eth\n/market\n/alerts\n/what_are_you_seeing\n/diagnostic"
 
     def _cmd_status(self) -> str:
         """Return system status - do we have recent data?"""
@@ -60,55 +65,89 @@ class CommandHandler:
             btc_count = self.db.get_observation_count(asset="BTC")
             eth_count = self.db.get_observation_count(asset="ETH")
 
+            # Use cache if available for freshness
+            if self.cache and self.cache.last_update:
+                freshness = self.cache.last_update
+            else:
+                freshness = "checking..."
+
             return (
-                f"✅ MIE está activa\n"
+                f"✅ MIE SYSTEM STATUS\n"
+                f"━━━━━━━━━━━━━━━━━━━━\n"
                 f"📊 BTC: {btc_count} observaciones\n"
                 f"📊 ETH: {eth_count} observaciones\n"
                 f"🔄 Ciclo: cada 5 minutos\n"
-                f"📌 Último update: ahora\n"
-                f"\nUsa /btc, /eth, /market, o /what_are_you_seeing"
+                f"🕐 Estado actualizado: {freshness}\n"
+                f"\n💡 Usa: /btc, /eth, /market, /alerts, /what_are_you_seeing"
             )
         except Exception as e:
             self.logger.error(f"Error in /status: {e}")
-            return f"Error en status: {e}"
+            return f"❌ Error en status: {e}"
 
     def _cmd_asset(self, asset: str) -> str:
-        """Show current asset price and recent changes."""
+        """Show asset price with momentum + 1h/24h changes."""
         try:
-            # Get latest price observation
-            obs = self.db.get_observations(
+            # Get 24h observations for changes
+            obs_24h = self.db.get_observations(
                 asset=asset,
                 lookback_hours=24,
                 observation_type="price"
             )
 
-            if not obs:
+            # Get 1h observations for 1h change
+            obs_1h = self.db.get_observations(
+                asset=asset,
+                lookback_hours=1,
+                observation_type="price"
+            )
+
+            if not obs_24h:
                 return f"📭 Sin datos para {asset} todavía."
 
-            # Get latest
-            latest = obs[-1]
-            current_price = latest["value"]
+            current_price = obs_24h[-1]["value"]
+            timestamp = obs_24h[-1].get("timestamp", "unknown")
 
             # Calculate changes
-            if len(obs) >= 2:
-                price_24h_ago = obs[0]["value"]
+            change_24h = 0.0
+            if len(obs_24h) >= 2:
+                price_24h_ago = obs_24h[0]["value"]
                 change_24h = ((current_price - price_24h_ago) / price_24h_ago) * 100
-            else:
-                change_24h = 0.0
+
+            change_1h = 0.0
+            if obs_1h and len(obs_1h) >= 2:
+                price_1h_ago = obs_1h[0]["value"]
+                change_1h = ((current_price - price_1h_ago) / price_1h_ago) * 100
+
+            # Get momentum from cache if available
+            momentum = "?"
+            if self.cache:
+                momentum = self.cache.momentum_4h.get(asset, "?")
+
+            trend = "?"
+            if self.cache:
+                trend = self.cache.trend.get(asset, "?")
+
+            # Determine direction emoji
+            dir_24h = "📈" if change_24h > 0 else "📉"
+            dir_1h = "📈" if change_1h > 0 else "📉"
 
             return (
                 f"💰 {asset}\n"
-                f"📈 Price: ${current_price:,.2f}\n"
-                f"📊 Change 24h: {change_24h:+.2f}%\n"
-                f"⏰ Updated: {latest['timestamp']}\n"
-                f"📍 Source: {latest['source']}"
+                f"━━━━━━━━━━━━━━━━━━━━\n"
+                f"💵 Price: ${current_price:,.2f}\n"
+                f"\n📊 Changes:\n"
+                f"  1h:   {dir_1h} {change_1h:+.2f}%\n"
+                f"  24h:  {dir_24h} {change_24h:+.2f}%\n"
+                f"\n🎯 Momentum: {momentum}\n"
+                f"📈 Trend: {trend}\n"
+                f"\n⏰ Last update: {timestamp[-8:]}"
             )
         except Exception as e:
             self.logger.error(f"Error in /{asset.lower()}: {e}")
-            return f"Error obteniendo datos de {asset}: {e}"
+            return f"❌ Error obteniendo datos de {asset}: {e}"
 
     def _cmd_market(self) -> str:
-        """Market overview - BTC, ETH, relative strength."""
+        """Market overview - serious summary."""
         try:
             btc_obs = self.db.get_observations(asset="BTC", lookback_hours=24, observation_type="price")
             eth_obs = self.db.get_observations(asset="ETH", lookback_hours=24, observation_type="price")
@@ -128,17 +167,39 @@ class CommandHandler:
             # ETH relative strength vs BTC
             relative_strength = eth_change - btc_change
 
+            # Get momentum from cache
+            btc_momentum = "?"
+            eth_momentum = "?"
+            if self.cache:
+                btc_momentum = self.cache.momentum_4h.get("BTC", "?")
+                eth_momentum = self.cache.momentum_4h.get("ETH", "?")
+
+            # Get volatility
+            btc_vol = "?"
+            eth_vol = "?"
+            if self.cache:
+                btc_vol = self.cache.volatility_signal.get("BTC", "?")
+                eth_vol = self.cache.volatility_signal.get("ETH", "?")
+
+            btc_dir = "↑" if btc_change > 0 else "↓"
+            eth_dir = "↑" if eth_change > 0 else "↓"
+            rel_dir = "📊" if relative_strength > 0 else "📊"
+
             return (
                 f"🌍 MARKET SNAPSHOT\n"
-                f"━━━━━━━━━━━━━━━━━\n"
-                f"💰 BTC: ${btc_latest:,.0f} ({btc_change:+.2f}%)\n"
-                f"💰 ETH: ${eth_latest:,.0f} ({eth_change:+.2f}%)\n"
-                f"📊 ETH vs BTC: {relative_strength:+.2f}%\n"
-                f"📌 Data points: {len(btc_obs)} BTC, {len(eth_obs)} ETH"
+                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"\n💰 BTC: ${btc_latest:,.0f} {btc_dir} {btc_change:+.2f}% (24h)\n"
+                f"   Momentum: {btc_momentum}\n"
+                f"   Volatility: {btc_vol}\n"
+                f"\n💰 ETH: ${eth_latest:,.0f} {eth_dir} {eth_change:+.2f}% (24h)\n"
+                f"   Momentum: {eth_momentum}\n"
+                f"   Volatility: {eth_vol}\n"
+                f"\n📊 Market Ratio: ETH {('over' if relative_strength > 0 else 'under')}performing by {abs(relative_strength):.2f}%\n"
+                f"📌 Data: {len(btc_obs)} BTC, {len(eth_obs)} ETH observations"
             )
         except Exception as e:
             self.logger.error(f"Error in /market: {e}")
-            return f"Error obteniendo mercado: {e}"
+            return f"❌ Error obteniendo mercado: {e}"
 
     def _cmd_what_seeing(self) -> str:
         """What is MIE seeing right now?"""
@@ -169,7 +230,40 @@ class CommandHandler:
             )
         except Exception as e:
             self.logger.error(f"Error in /what_are_you_seeing: {e}")
-            return f"Error: {e}"
+            return f"❌ Error: {e}"
+
+    def _cmd_alerts(self) -> str:
+        """Show active alerts (NIVEL 1: empty for now)."""
+        try:
+            if not self.cache:
+                return "⚠️  Alert system not initialized yet."
+
+            alerts = self.cache.active_alerts
+            total = sum(len(v) for v in alerts.values())
+
+            if total == 0:
+                return (
+                    f"🚨 ALERTS\n"
+                    f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                    f"✅ No active alerts\n"
+                    f"Last scan: {self.cache.last_alert_scan or 'never'}"
+                )
+
+            # Format alerts if any exist
+            alert_text = f"🚨 ALERTS\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            for asset in ["BTC", "ETH"]:
+                if asset in alerts and alerts[asset]:
+                    alert_text += f"\n{asset}:\n"
+                    for alert in alerts[asset]:
+                        alert_text += f"  ⚠️  {alert.get('message', 'Unknown alert')}\n"
+
+            alert_text += f"\n📋 Total: {total} active\n"
+            alert_text += f"🔔 Last scan: {self.cache.last_alert_scan or 'never'}"
+            return alert_text
+
+        except Exception as e:
+            self.logger.error(f"Error in /alerts: {e}")
+            return f"❌ Error obteniendo alerts: {e}"
 
     def _cmd_diagnostic(self) -> str:
         """Deployment diagnostic - check if code and data are in sync."""
@@ -212,4 +306,4 @@ class CommandHandler:
 
         except Exception as e:
             self.logger.error(f"Error in /diagnostic: {e}")
-            return f"Error en diagnostic: {e}"
+            return f"❌ Error en diagnostic: {e}"
