@@ -1,32 +1,37 @@
 """
-MIE Command Handler - NIVEL 1-4 Commands
-Handles: /status, /btc, /eth, /market, /what_are_you_seeing, /alerts, /diagnostic, /backtest
+MIE Command Handler - NIVEL 1-6 Commands
+Handles: /status, /btc, /eth, /market, /what_are_you_seeing, /alerts, /diagnostic, /backtest, /validation, /adaptive
 Only uses data that exists in DB. No improvisation.
 Uses state_cache for fast responses.
 NIVEL 4: Real hypothesis backtesting with actual market data
+NIVEL 5: Decision registry + outcome tracking
+NIVEL 6: Adaptive feedback + alert filtering
 """
 
 import logging
 from typing import Optional, Dict, List
 from datetime import datetime
 from mie.backtester_real import RealHypothesisBacktester
+from mie.adaptive_feedback import AdaptiveFeedbackEngine
 
 
 class CommandHandler:
     """Process MIE commands and return real data from DB."""
 
-    def __init__(self, db, logger: Optional[logging.Logger] = None, cache=None, decision_registry=None):
+    def __init__(self, db, logger: Optional[logging.Logger] = None, cache=None, decision_registry=None, adaptive_feedback=None):
         """
         Args:
             db: MIEDatabase instance
             logger: Logger instance
             cache: MIEStateCache instance (optional)
             decision_registry: DecisionRegistry instance (optional, for NIVEL 5)
+            adaptive_feedback: AdaptiveFeedbackEngine instance (optional, for NIVEL 6)
         """
         self.db = db
         self.logger = logger or logging.getLogger("CommandHandler")
         self.cache = cache
         self.decision_registry = decision_registry
+        self.adaptive_feedback = adaptive_feedback
         self.backtester = RealHypothesisBacktester(db=db, logger=logger)
 
     def handle_command(self, message: str, user_id: str = "unknown") -> Optional[str]:
@@ -64,10 +69,13 @@ class CommandHandler:
         elif command == "/validation":
             # /validation - Show decision validation metrics (NIVEL 5)
             return self._cmd_validation()
+        elif command == "/adaptive":
+            # /adaptive - Show adaptive feedback status (NIVEL 6)
+            return self._cmd_adaptive()
         elif command == "/diagnostic":
             return self._cmd_diagnostic()
         else:
-            return f"❌ Comando desconocido: {command}\n\n📋 Disponibles:\n/status\n/btc\n/eth\n/market\n/alerts\n/hypothesis\n/backtest\n/validation\n/what_are_you_seeing\n/diagnostic"
+            return f"❌ Comando desconocido: {command}\n\n📋 Disponibles:\n/status\n/btc\n/eth\n/market\n/alerts\n/hypothesis\n/backtest\n/validation\n/adaptive\n/what_are_you_seeing\n/diagnostic"
 
     def _cmd_status(self) -> str:
         """Return system status - do we have recent data?"""
@@ -493,3 +501,27 @@ class CommandHandler:
         except Exception as e:
             self.logger.error(f"Error in /validation: {e}")
             return f"❌ Error en validation: {e}"
+
+    def _cmd_adaptive(self) -> str:
+        """
+        Show adaptive feedback status (NIVEL 6).
+        Displays current thresholds and hypothesis type performance.
+        """
+        try:
+            if not self.adaptive_feedback:
+                return (
+                    f"🎯 ADAPTIVE FEEDBACK (NIVEL 6)\n"
+                    f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                    f"⏳ Adaptive feedback engine not initialized\n"
+                    f"Waiting for first decisions to be recorded..."
+                )
+
+            # Analyze decisions first
+            self.adaptive_feedback.analyze_completed_decisions()
+
+            # Return status report
+            return self.adaptive_feedback.format_status_report()
+
+        except Exception as e:
+            self.logger.error(f"Error in /adaptive: {e}")
+            return f"❌ Error en adaptive: {e}"

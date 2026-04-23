@@ -49,6 +49,7 @@ from mie.pattern_detector import PatternDetector
 from mie.hypothesis_generator import HypothesisGenerator
 from mie.backtester_real import RealHypothesisBacktester
 from mie.decision_registry import DecisionRegistry
+from mie.adaptive_feedback import AdaptiveFeedbackEngine
 
 
 class MIEOrchestrator:
@@ -73,7 +74,8 @@ class MIEOrchestrator:
         self.hypothesis_generator = HypothesisGenerator(logger=self.logger)
         self.backtester_real = RealHypothesisBacktester(db=self.db, logger=self.logger)
         self.decision_registry = DecisionRegistry(db=self.db, logger=self.logger)
-        self.commands = CommandHandler(self.db, self.logger, cache=self.cache, decision_registry=self.decision_registry)
+        self.adaptive_feedback = AdaptiveFeedbackEngine(decision_registry=self.decision_registry, logger=self.logger)
+        self.commands = CommandHandler(self.db, self.logger, cache=self.cache, decision_registry=self.decision_registry, adaptive_feedback=self.adaptive_feedback)
 
         # Telegram config
         self.telegram_token = telegram_token
@@ -379,6 +381,18 @@ class MIEOrchestrator:
                                     self.logger.warning(f"  ⚠️  Failed to record decision for {hyp.get('asset')}")
                             except Exception as de:
                                 self.logger.warning(f"  ⚠️  Decision registry error (non-critical): {de}")
+
+                            # CHECK ADAPTIVE THRESHOLDS (NIVEL 6)
+                            try:
+                                should_alert = self.adaptive_feedback.should_alert(hyp, backtest_score)
+                                if should_alert:
+                                    self.logger.info(f"  🔔 ALERT APPROVED by adaptive feedback (score={backtest_score:.2f})")
+                                else:
+                                    self.logger.debug(f"  ⏸️  Alert filtered by adaptive feedback")
+                                hyp['alert_approved'] = should_alert
+                            except Exception as af:
+                                self.logger.debug(f"  ⚠️  Adaptive feedback error (non-critical): {af}")
+                                hyp['alert_approved'] = True  # Default to alert if feedback fails
             except Exception as e:
                 self.logger.warning(f"⚠️  Cache/pattern update failed (non-critical): {e}")
 
@@ -491,6 +505,34 @@ class MIEOrchestrator:
                 continue
 
         return closest if min_diff < 3600 else None  # Max 1 hour difference
+
+    def adaptive_feedback_loop(self):
+        """
+        Ejecuta cada 1 hora: Analiza outcomes completados y ajusta alertas
+        en tiempo real basado en que funciona y que no.
+        NIVEL 6: Adaptive Feedback Loop
+        """
+        try:
+            self.logger.info("🔄 ADAPTIVE FEEDBACK LOOP iniciando...")
+
+            # Analyze completed decisions
+            analysis = self.adaptive_feedback.analyze_completed_decisions()
+
+            if analysis.get("status") == "no_data":
+                self.logger.debug("⏳ Not enough data yet for adaptive feedback")
+                return
+
+            # Generate recommendations
+            recommendations = self.adaptive_feedback.generate_recommendations()
+
+            # Apply recommendations
+            report = self.adaptive_feedback.apply_recommendations(recommendations)
+            self.logger.info(report)
+
+            self.logger.info("✅ ADAPTIVE FEEDBACK LOOP completado")
+
+        except Exception as e:
+            self.logger.warning(f"⚠️  Adaptive feedback loop error (non-critical): {e}")
 
     def daily_loop(self):
         """Ejecuta a las 08:00 UTC: reflexion + investigacion + research layer"""
@@ -606,12 +648,15 @@ class MIEOrchestrator:
         return summary
 
     def schedule_loops(self):
-        """Configura schedule con cuatro ciclos"""
+        """Configura schedule con cinco ciclos"""
         # Fast loop: cada 5 minutos (incluye chequeo de Telegram + pattern detection + hypothesis generation)
         schedule.every(5).minutes.do(self.fast_loop)
 
         # Outcome tracking loop: cada 5 minutos (trackea outcomes de decisiones activas)
         schedule.every(5).minutes.do(self.outcome_tracking_loop)
+
+        # Adaptive feedback loop: cada 1 hora (ajusta alertas basado en outcomes)
+        schedule.every(1).hour.do(self.adaptive_feedback_loop)
 
         # Daily loop: 08:00 UTC
         schedule.every().day.at("08:00").do(self.daily_loop)
@@ -625,6 +670,7 @@ class MIEOrchestrator:
         self.logger.info("✅ Loops programados:")
         self.logger.info("  - Fast: cada 5 minutos (ingesta + patrones + hipótesis)")
         self.logger.info("  - Outcome tracking: cada 5 minutos (outcomes +1h/+4h/+24h)")
+        self.logger.info("  - Adaptive feedback: cada 1 hora (ajusta alertas)")
         self.logger.info("  - Daily: 08:00 UTC")
         self.logger.info("  - Weekly: domingo 08:00 UTC")
         self.logger.info("  - Monthly: 1º de mes 18:00 UTC")
