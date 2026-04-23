@@ -2,6 +2,7 @@
 DialogueHandler para MIE V1
 Maneja conversaciones REALES con Claude API.
 MIE ahora es una IA verdadera, no un bot.
+Unified: lee del mismo DB que los comandos - una sola fuente de verdad.
 """
 
 import os
@@ -9,12 +10,14 @@ from datetime import datetime
 from typing import Optional
 from .claude_ai_handler import ClaudeAIHandler
 from .market_state import MarketStateEngine
+from .unified_context import UnifiedContextProvider
 
 
 class DialogueHandler:
     """
     Maneja diálogos bidireccionales con usuarios vía Telegram.
     Usa Claude API real para conversaciones inteligentes.
+    Lee del mismo DB que los comandos - contexto unificado.
     """
 
     def __init__(self, db, logger, cache=None):
@@ -52,6 +55,9 @@ class DialogueHandler:
         # Inicializar market state para contexto
         self.market_state = MarketStateEngine(db)
 
+        # Unified context provider - same source as commands
+        self.context_provider = UnifiedContextProvider(db, logger)
+
     def handle_message(self, message: str, user_id: str = "unknown") -> str:
         """
         Procesa un mensaje de usuario y genera respuesta con Claude API.
@@ -70,39 +76,16 @@ class DialogueHandler:
                 self.logger.error("Claude handler no disponible")
                 return "No tengo Claude API configurada. Disculpa."
 
-            # Obtener contexto del mercado para Claude - SIEMPRE usar datos reales de cache/DB
+            # Obtener contexto del mercado - UNIFIED SOURCE
+            # Lee del DB directamente, no del cache que puede estar desactualizado
             market_context = ""
             try:
-                if self.cache and self.cache.last_btc_obs and self.cache.last_eth_obs:
-                    # Usar cache con datos actualizados
-                    btc_price = self.cache.last_btc_obs.get('value', 0)
-                    eth_price = self.cache.last_eth_obs.get('value', 0)
-                    btc_momentum = self.cache.momentum_4h.get('BTC', 'UNKNOWN')
-                    eth_momentum = self.cache.momentum_4h.get('ETH', 'UNKNOWN')
-                    btc_trend = self.cache.trend.get('BTC', 'UNKNOWN')
-                    eth_trend = self.cache.trend.get('ETH', 'UNKNOWN')
-
-                    market_context = (
-                        f"CONTEXTO ACTUAL DEL MERCADO (datos reales de BD):\n"
-                        f"- BTC: ${btc_price:,.2f} | Momentum 4h: {btc_momentum} | Trend: {btc_trend}\n"
-                        f"- ETH: ${eth_price:,.2f} | Momentum 4h: {eth_momentum} | Trend: {eth_trend}\n"
-                        f"- Actualizado: {self.cache.last_update}\n"
-                        f"\nIMPORTANTE: Usa SOLO estos datos para análisis. No inventes otros números."
-                    )
-                else:
-                    # Fallback a market_state si cache no está disponible
-                    context_data = self.market_state.get_market_context()
-                    if "error" not in context_data:
-                        market_context = (
-                            f"CONTEXTO ACTUAL DEL MERCADO (datos de BD):\n"
-                            f"- BTC: ${context_data.get('btc', {}).get('price', 0):,.0f}\n"
-                            f"- ETH: ${context_data.get('eth', {}).get('price', 0):,.0f}\n"
-                            f"- Volatilidad: {context_data.get('overall_volatility', 'UNKNOWN')}\n"
-                            f"\nIMPORTANTE: Usa SOLO estos datos. No inventes números."
-                        )
+                market_context = self.context_provider.get_dialogue_prompt_context(message)
+                if not market_context:
+                    market_context = "No hay datos de mercado disponibles."
             except Exception as e:
-                self.logger.warning(f"Error obteniendo contexto: {e}")
-                market_context = "No tengo contexto de mercado disponible ahora."
+                self.logger.warning(f"Error obteniendo contexto unificado: {e}")
+                market_context = "Error al obtener contexto de mercado."
 
             # Generar respuesta con Claude API
             response = self.claude_handler.generate_response(message, market_context)
@@ -111,8 +94,7 @@ class DialogueHandler:
             self._save_dialogue(message, response, user_id)
 
             self.logger.info(f"🤖 Respuesta Claude: {response[:80]}...")
-            # Add production marker for validation
-            return f"[MIE-SINGLE-RUNTIME-CHECK] {response}"
+            return response
 
         except Exception as e:
             self.logger.error(f"Error en handle_message: {e}", exc_info=True)
