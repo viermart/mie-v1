@@ -538,6 +538,78 @@ class MIEOrchestrator:
         except Exception as e:
             self.logger.warning(f"⚠️  Adaptive feedback loop error (non-critical): {e}")
 
+    def validation_reporting_loop(self):
+        """
+        Ejecuta cada 12 horas: Envía reporte de validación a Telegram
+        VALIDACIÓN OPERATIVA 72h
+        """
+        try:
+            self.logger.info("📊 VALIDATION REPORTING LOOP iniciando...")
+
+            # Collect validation metrics
+            validation_data = {
+                "timestamp": datetime.utcnow().isoformat(),
+                "active_decisions": len(self.decision_registry.active_decisions),
+                "completed_decisions": len(self.decision_registry.completed_decisions),
+                "total_decisions": len(self.decision_registry.active_decisions) + len(self.decision_registry.completed_decisions),
+            }
+
+            # Calculate provisional metrics
+            if len(self.decision_registry.completed_decisions) > 0:
+                wins = sum(1 for d in self.decision_registry.completed_decisions
+                          if d.get("outcome_24h", {}).get("win", False))
+                total = len(self.decision_registry.completed_decisions)
+                validation_data["win_rate_provisional"] = f"{(wins/total*100):.1f}%"
+                validation_data["total_outcomes"] = total
+
+                # False alerts (predictions with negative outcomes)
+                false_alerts = sum(1 for d in self.decision_registry.completed_decisions
+                                  if not d.get("outcome_24h", {}).get("win", False))
+                validation_data["false_alert_rate"] = f"{(false_alerts/total*100):.1f}%"
+            else:
+                validation_data["win_rate_provisional"] = "N/A"
+                validation_data["total_outcomes"] = 0
+                validation_data["false_alert_rate"] = "N/A"
+
+            # Format report
+            report = (
+                f"📊 VALIDACIÓN OPERATIVA 72h - REPORTE AUTOMÁTICO\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"⏱️  Timestamp: {validation_data['timestamp']}\n"
+                f"\n📈 CORE ENGINE METRICS:\n"
+                f"  Total decisiones: {validation_data['total_decisions']}\n"
+                f"  Activas (pendientes): {validation_data['active_decisions']}\n"
+                f"  Completadas (con outcome): {validation_data['completed_decisions']}\n"
+                f"  Total outcomes registrados: {validation_data['total_outcomes']}\n"
+                f"\n🎯 PERFORMANCE:\n"
+                f"  Win rate provisional: {validation_data['win_rate_provisional']}\n"
+                f"  False alert rate: {validation_data['false_alert_rate']}\n"
+                f"\n⚙️  ADAPTATIVE FEEDBACK:\n"
+            )
+
+            # Add adaptive feedback status
+            if self.adaptive_feedback:
+                feedback_status = self.adaptive_feedback.analyze_completed_decisions()
+                if feedback_status.get("status") != "no_data":
+                    type_stats = self.adaptive_feedback.type_stats
+                    for hyp_type, stats in type_stats.items():
+                        alert_status = "✅ ENABLED" if stats.get("alert_enabled", False) else "❌ DISABLED"
+                        report += f"  {hyp_type}: WR={stats.get('win_rate', 0):.1%} {alert_status}\n"
+
+            report += f"\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+
+            # Send to Telegram
+            try:
+                self.reporter.send_message(report)
+                self.logger.info("✅ Validation report sent to Telegram")
+            except Exception as te:
+                self.logger.warning(f"⚠️  Failed to send Telegram report: {te}")
+
+            self.logger.info("✅ VALIDATION REPORTING LOOP completado")
+
+        except Exception as e:
+            self.logger.warning(f"⚠️  Validation reporting loop error (non-critical): {e}")
+
     def ml_training_loop(self):
         """
         Ejecuta cada 2 horas: Reentrenar modelos ML con nuevos outcomes
@@ -690,6 +762,9 @@ class MIEOrchestrator:
         # ML training loop: cada 2 horas (reentrenar modelos)
         schedule.every(2).hours.do(self.ml_training_loop)
 
+        # Validation reporting loop: cada 12 horas (VALIDACIÓN OPERATIVA 72h)
+        schedule.every(12).hours.do(self.validation_reporting_loop)
+
         # Daily loop: 08:00 UTC
         schedule.every().day.at("08:00").do(self.daily_loop)
 
@@ -703,6 +778,8 @@ class MIEOrchestrator:
         self.logger.info("  - Fast: cada 5 minutos (ingesta + patrones + hipótesis)")
         self.logger.info("  - Outcome tracking: cada 5 minutos (outcomes +1h/+4h/+24h)")
         self.logger.info("  - Adaptive feedback: cada 1 hora (ajusta alertas)")
+        self.logger.info("  - ML training: cada 2 horas (retrain models)")
+        self.logger.info("  - Validation reporting: cada 12 horas (VALIDACIÓN OPERATIVA 72h)")
         self.logger.info("  - Daily: 08:00 UTC")
         self.logger.info("  - Weekly: domingo 08:00 UTC")
         self.logger.info("  - Monthly: 1º de mes 18:00 UTC")
