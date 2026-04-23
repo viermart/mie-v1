@@ -51,6 +51,7 @@ from mie.backtester_real import RealHypothesisBacktester
 from mie.decision_registry import DecisionRegistry
 from mie.adaptive_feedback import AdaptiveFeedbackEngine
 from mie.risk_manager import RiskManager
+from mie.ml_engine import MLEngine
 
 
 class MIEOrchestrator:
@@ -77,7 +78,8 @@ class MIEOrchestrator:
         self.decision_registry = DecisionRegistry(db=self.db, logger=self.logger)
         self.adaptive_feedback = AdaptiveFeedbackEngine(decision_registry=self.decision_registry, logger=self.logger)
         self.risk_manager = RiskManager(decision_registry=self.decision_registry, logger=self.logger)
-        self.commands = CommandHandler(self.db, self.logger, cache=self.cache, decision_registry=self.decision_registry, adaptive_feedback=self.adaptive_feedback, risk_manager=self.risk_manager)
+        self.ml_engine = MLEngine(decision_registry=self.decision_registry, logger=self.logger)
+        self.commands = CommandHandler(self.db, self.logger, cache=self.cache, decision_registry=self.decision_registry, adaptive_feedback=self.adaptive_feedback, risk_manager=self.risk_manager, ml_engine=self.ml_engine)
 
         # Telegram config
         self.telegram_token = telegram_token
@@ -536,6 +538,31 @@ class MIEOrchestrator:
         except Exception as e:
             self.logger.warning(f"⚠️  Adaptive feedback loop error (non-critical): {e}")
 
+    def ml_training_loop(self):
+        """
+        Ejecuta cada 2 horas: Reentrenar modelos ML con nuevos outcomes
+        NIVEL 8: Machine Learning Integration
+        """
+        try:
+            self.logger.info("🤖 ML TRAINING LOOP iniciando...")
+
+            # Train ML models from completed decisions
+            training_result = self.ml_engine.train_from_completed_decisions()
+
+            if training_result.get("status") == "no_data":
+                self.logger.debug("⏳ Not enough data yet for ML training")
+                return
+
+            self.logger.info(
+                f"🤖 ML training: {training_result['decisions_processed']} decisions, "
+                f"{training_result['unique_patterns']} patterns"
+            )
+
+            self.logger.info("✅ ML TRAINING LOOP completado")
+
+        except Exception as e:
+            self.logger.warning(f"⚠️  ML training loop error (non-critical): {e}")
+
     def daily_loop(self):
         """Ejecuta a las 08:00 UTC: reflexion + investigacion + research layer"""
         try:
@@ -659,6 +686,9 @@ class MIEOrchestrator:
 
         # Adaptive feedback loop: cada 1 hora (ajusta alertas basado en outcomes)
         schedule.every(1).hour.do(self.adaptive_feedback_loop)
+
+        # ML training loop: cada 2 horas (reentrenar modelos)
+        schedule.every(2).hours.do(self.ml_training_loop)
 
         # Daily loop: 08:00 UTC
         schedule.every().day.at("08:00").do(self.daily_loop)
