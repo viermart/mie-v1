@@ -260,21 +260,28 @@ class MIEOrchestrator:
             self.logger.info("▶️  FAST LOOP iniciando...")
 
             # Chequea mensajes de Telegram
+            self.logger.debug("  → Checking Telegram messages...")
             self._check_telegram_messages()
 
             for asset in self.assets:
                 try:
+                    self.logger.debug(f"  → Fetching {asset} from Binance...")
                     # Obtiene datos crudos de Binance
                     raw_obs = self.binance.ingest_observation(asset)
+                    self.logger.debug(f"    ✅ Raw data received: {raw_obs.get('asset')} @ {raw_obs.get('timestamp')}")
+
                     parsed = self.binance.parse_observation(raw_obs)
+                    self.logger.debug(f"    ✅ Parsed: price=${parsed['price']:.2f}")
 
                     # Persiste precio como observación
+                    self.logger.debug(f"    → Saving to DB...")
                     price_obs_id = self.db.add_observation(
                         asset=asset,
                         observation_type="price",
                         value=parsed["price"],
                         context=f"24h_change: {parsed['price_24h_change']:.2f}%, vol: {parsed['volume_24h']:.0f}"
                     )
+                    self.logger.debug(f"    ✅ DB insert OK: id={price_obs_id}")
 
                     # Persiste funding rate si existe
                     if parsed["funding_rate"] is not None:
