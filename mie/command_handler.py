@@ -233,32 +233,56 @@ class CommandHandler:
             return f"❌ Error: {e}"
 
     def _cmd_alerts(self) -> str:
-        """Show active alerts (NIVEL 1: empty for now)."""
+        """Show detected patterns + active alerts (NIVEL 3)."""
         try:
             if not self.cache:
                 return "⚠️  Alert system not initialized yet."
 
+            # Get detected patterns
+            patterns = self.cache.detected_patterns or []
             alerts = self.cache.active_alerts
-            total = sum(len(v) for v in alerts.values())
 
-            if total == 0:
+            if not patterns and not alerts:
                 return (
-                    f"🚨 ALERTS\n"
+                    f"🚨 ALERTS & PATTERNS\n"
                     f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                    f"✅ No patterns detected\n"
                     f"✅ No active alerts\n"
-                    f"Last scan: {self.cache.last_alert_scan or 'never'}"
+                    f"Last scan: {self.cache.last_pattern_scan or 'never'}"
                 )
 
-            # Format alerts if any exist
-            alert_text = f"🚨 ALERTS\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-            for asset in ["BTC", "ETH"]:
-                if asset in alerts and alerts[asset]:
-                    alert_text += f"\n{asset}:\n"
-                    for alert in alerts[asset]:
-                        alert_text += f"  ⚠️  {alert.get('message', 'Unknown alert')}\n"
+            alert_text = f"🚨 ALERTS & PATTERNS\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
 
-            alert_text += f"\n📋 Total: {total} active\n"
-            alert_text += f"🔔 Last scan: {self.cache.last_alert_scan or 'never'}"
+            # Show detected patterns
+            if patterns:
+                alert_text += "\n🔍 DETECTED PATTERNS:\n"
+                for pattern in patterns:
+                    asset = pattern.get("asset", "UNKNOWN")
+                    ptype = pattern.get("type", "?")
+
+                    if ptype == "momentum_shift":
+                        direction = pattern.get("direction", "?")
+                        change = pattern.get("change_pct", 0)
+                        alert_text += f"  {asset}: Momentum {direction} ({change:+.2f}%)\n"
+                    elif ptype == "volatility_spike":
+                        ratio = pattern.get("ratio", 0)
+                        alert_text += f"  {asset}: Volatility spike ({ratio:.1f}x normal)\n"
+                    elif ptype == "breakout":
+                        direction = pattern.get("direction", "?")
+                        price = pattern.get("current_price", 0)
+                        alert_text += f"  {asset}: Breakout {direction} (${price:,.2f})\n"
+
+            # Show manual alerts
+            total_alerts = sum(len(v) for v in alerts.values())
+            if total_alerts > 0:
+                alert_text += "\n⚠️  ACTIVE ALERTS:\n"
+                for asset in ["BTC", "ETH"]:
+                    if asset in alerts and alerts[asset]:
+                        for alert in alerts[asset]:
+                            alert_text += f"  {asset}: {alert.get('message', '?')}\n"
+
+            alert_text += f"\n📋 Total patterns: {len(patterns)}, Manual alerts: {total_alerts}\n"
+            alert_text += f"🔔 Last scan: {self.cache.last_pattern_scan or 'never'}"
             return alert_text
 
         except Exception as e:
