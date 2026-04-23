@@ -43,8 +43,10 @@ class CommandHandler:
             return self._cmd_market()
         elif command == "/what_are_you_seeing":
             return self._cmd_what_seeing()
+        elif command == "/diagnostic":
+            return self._cmd_diagnostic()
         else:
-            return f"Comando desconocido: {command}\nDisponibles: /status, /btc, /eth, /market, /what_are_you_seeing"
+            return f"Comando desconocido: {command}\nDisponibles: /status, /btc, /eth, /market, /what_are_you_seeing, /diagnostic"
 
     def _cmd_status(self) -> str:
         """Return system status - do we have recent data?"""
@@ -168,3 +170,35 @@ class CommandHandler:
         except Exception as e:
             self.logger.error(f"Error in /what_are_you_seeing: {e}")
             return f"Error: {e}"
+
+    def _cmd_diagnostic(self) -> str:
+        """Deployment diagnostic - check if code and data are in sync."""
+        try:
+            btc_count = self.db.get_observation_count(asset="BTC")
+            eth_count = self.db.get_observation_count(asset="ETH")
+            btc_recent = self.db.get_observations(asset="BTC", lookback_hours=1, observation_type="price")
+            eth_recent = self.db.get_observations(asset="ETH", lookback_hours=1, observation_type="price")
+
+            diagnosis = "🔍 DIAGNOSTIC REPORT\n"
+            diagnosis += "━━━━━━━━━━━━━━━━━━\n"
+            diagnosis += f"✅ Code version: 20260422-BINANCE-FIX\n"
+            diagnosis += f"📊 Total observations: BTC={btc_count}, ETH={eth_count}\n"
+            diagnosis += f"📊 Recent (< 1h): BTC={len(btc_recent or [])}, ETH={len(eth_recent or [])}\n"
+
+            if btc_count == 0:
+                diagnosis += "\n❌ ISSUE: No observations at all - fast_loop never ran"
+            elif not btc_recent:
+                diagnosis += "\n⚠️  ISSUE: Data exists but all older than 1h - fast_loop not running regularly"
+            elif btc_recent and btc_recent[-1].get('value', 0) == 0:
+                diagnosis += "\n⚠️  ISSUE: Recent data shows $0 - Binance fetch failing"
+            else:
+                diagnosis += "\n✅ STATUS: Everything OK - data flowing"
+                if btc_recent and btc_recent[-1]:
+                    latest_btc = btc_recent[-1]
+                    diagnosis += f"\n  Latest BTC: ${latest_btc.get('value', 0):,.2f}"
+
+            return diagnosis
+
+        except Exception as e:
+            self.logger.error(f"Error in /diagnostic: {e}")
+            return f"Error en diagnostic: {e}"
