@@ -48,6 +48,8 @@ from mie.state_cache import MIEStateCache
 from mie.pattern_detector import PatternDetector
 from mie.hypothesis_generator import HypothesisGenerator
 from mie.backtester_real import RealHypothesisBacktester
+from mie.research_logs import ResearchLogManager
+from mie.research_quality_gate import ResearchQualityGate
 from mie.decision_registry import DecisionRegistry
 from mie.adaptive_feedback import AdaptiveFeedbackEngine
 from mie.risk_manager import RiskManager
@@ -107,7 +109,15 @@ class MIEOrchestrator:
         self.backtester = HypothesisBacktester(db=self.db, logger=self.logger)
         self.portfolio = PortfolioManager(db=self.db, logger=self.logger)
         self.persistence = DataPersistenceManager(base_dir="data")
-        
+
+        # Research logs manager - Phase 2 of research layer
+        self.research_logs = ResearchLogManager(base_dir="research_logs")
+        self.logger.info("✅ Research logs manager initialized")
+
+        # Research quality gate - Phase 2.5 (automatic validation)
+        self.quality_gate = ResearchQualityGate(base_dir="research_logs")
+        self.logger.info("✅ Research quality gate initialized")
+
         # Market scanning components
         self.price_scanner = PriceActionScanner()
         self.volume_scanner = VolumeScanner()
@@ -648,26 +658,114 @@ class MIEOrchestrator:
             self.logger.warning(f"⚠️  ML training loop error (non-critical): {e}")
 
     def daily_loop(self):
-        """Ejecuta a las 08:00 UTC: reflexion + investigacion + research layer"""
+        """
+        Ejecuta a las 08:00 UTC: reflexion + investigacion + research layer COMPLETA
+
+        Fases:
+        1. Reflect on observations (T+0min)
+        2. Generate micro-hypotheses (T+85min)
+        3. Design mini-validations (T+92min)
+        4. Execute validation on ready hypotheses (T+99min)
+        5. Classify results + update hypothesis status (T+104min)
+        6. Log learning + send report (T+115min)
+        """
         try:
-            self.logger.info("\n🔄 DAILY LOOP iniciando...")
+            self.logger.info("\n🔄 DAILY LOOP iniciando con RESEARCH LAYER COMPLETA...\n")
+
+            # ========== PHASE 1: REFLECT ON OBSERVATIONS ==========
+            self.logger.info("📊 [T+0min] Reflecting on last 24h observations...")
             summary = self._reflect_on_observations(lookback_hours=24)
+
+            # ========== PHASE 2: GENERATE MICRO-HYPOTHESES ==========
+            self.logger.info("🧠 [T+85min] Generating micro-hypotheses from repeated observations...")
             new_hyps = self.research.generate_micro_hypotheses()
-            self.logger.info(f"Generated {len(new_hyps)} micro-hypotheses")
-            
+            self.logger.info(f"   ✅ Generated {len(new_hyps)} new micro-hypotheses")
+
+            # ========== PHASE 3 & 4: DESIGN & EXECUTE MINI-VALIDATIONS ==========
+            self.logger.info("🔬 [T+92min] Executing mini-validations on ready hypotheses...")
+
             registry = self.research._load_hypothesis_registry()
+            active_hyps = registry.get("active", [])
+
+            # Get hypotheses ready for testing (awaiting_validation status)
+            ready_hyps = [h for h in active_hyps if h.get("status") == "awaiting_validation"]
+
+            experiments_run = []
+            classifications = []
+
+            for i, hyp in enumerate(ready_hyps[:3]):  # Max 3 per day
+                self.logger.info(f"   [Exp {i+1}] Testing {hyp.get('id')} ({hyp.get('observation')})")
+
+                try:
+                    # Execute mini-validation
+                    result = self.research.execute_validation(hyp)
+
+                    # ========== QUALITY GATE VALIDATION (Phase 2.5) ==========
+                    is_valid, failure_reasons = self.quality_gate.validate(result, hyp)
+
+                    if not is_valid:
+                        self.logger.warning(f"       ⚠️  Quality gate FAILED for {hyp.get('id')}")
+                        for reason in failure_reasons:
+                            self.logger.warning(f"          → {reason}")
+
+                        # Archive as invalid (don't process further)
+                        self.quality_gate.archive_invalid_experiment(result, failure_reasons)
+
+                        # Skip this experiment - move to next hypothesis
+                        continue
+
+                    experiments_run.append(result)
+
+                    # Extract classification
+                    classification = result.get("classification", "unknown")
+                    classifications.append({
+                        "hypothesis_id": hyp.get("id"),
+                        "classification": classification,
+                        "success_rate": result.get("results", {}).get("success_rate", 0)
+                    })
+
+                    self.logger.info(f"       → Classification: {classification}")
+
+                    # ========== PHASE 5: UPDATE HYPOTHESIS STATUS ==========
+                    self._update_hypothesis_status(hyp.get("id"), classification, result)
+
+                    # ========== Log to research logs ==========
+                    self.research_logs.append_experiment(result)
+
+                except Exception as e:
+                    self.logger.warning(f"   ⚠️  Error testing {hyp.get('id')}: {e}")
+                    classifications.append({
+                        "hypothesis_id": hyp.get("id"),
+                        "classification": "error",
+                        "error": str(e)
+                    })
+
+            self.logger.info(f"   ✅ Executed {len(experiments_run)} mini-validations\n")
+
+            # ========== PHASE 6: LOG LEARNING & SEND REPORT ==========
+            self.logger.info("📝 [T+105min] Logging learning and sending daily report...")
+
             active_hyps = self.db.get_active_hypotheses()
-            
+            learning_content = {
+                "timestamp": datetime.utcnow().isoformat(),
+                "summary": summary,
+                "research_phase": {
+                    "new_hypotheses": len(new_hyps),
+                    "ready_hypotheses": len(ready_hyps),
+                    "experiments_run": len(experiments_run),
+                    "classifications": classifications
+                },
+                "active_hypotheses_count": len(active_hyps)
+            }
+
             self.db.add_learning_log(
                 log_type="daily",
-                content=json.dumps({
-                    "timestamp": datetime.utcnow().isoformat(),
-                    "summary": summary,
-                    "new_hypotheses": len(new_hyps),
-                    "active": len(active_hyps)
-                })
+                content=json.dumps(learning_content)
             )
-            
+
+            # Also log to research logs (Phase 2)
+            self.research_logs.append_learning("daily", learning_content)
+
             self.reporter.send_daily_report(summary, active_hyps)
             self.logger.info("✅ DAILY LOOP completado\n")
             self.last_daily = datetime.utcnow()
@@ -675,6 +773,62 @@ class MIEOrchestrator:
         except Exception as e:
             self.logger.error(f"DAILY LOOP error: {e}", exc_info=True)
             self.reporter.send_error(f"Daily loop error: {e}")
+
+    def _update_hypothesis_status(self, hyp_id: str, classification: str, result: Dict):
+        """
+        Update hypothesis status based on classification result.
+
+        Classification levels:
+        - falsified (success < 60%): DISCARD
+        - weakly_supported (60-75%): KEEP TESTING
+        - supported (75-85%): PATTERN CANDIDATE
+        - strongly_supported (>85%): MONITOR CLOSELY
+        - insufficient_data: AWAITING MORE DATA
+        """
+        registry = self.research._load_hypothesis_registry()
+        active_hyps = registry.get("active", [])
+
+        # Find and update hypothesis
+        for hyp in active_hyps:
+            if hyp.get("id") == hyp_id:
+                hyp["last_tested"] = datetime.utcnow().isoformat()
+                hyp["last_result"] = result
+
+                # Update status based on classification
+                if classification == "falsified":
+                    hyp["status"] = "completed"
+                    hyp["confidence"] = "falsified"
+                    hyp["decision"] = "discard"
+                    self.logger.info(f"   ❌ {hyp_id}: FALSIFIED (success < 60%)")
+
+                elif classification == "weakly_supported":
+                    hyp["status"] = "testing"
+                    hyp["confidence"] = "weakly_supported"
+                    hyp["decision"] = "keep_testing"
+                    self.logger.info(f"   🟡 {hyp_id}: WEAKLY SUPPORTED (keep testing)")
+
+                elif classification == "supported":
+                    hyp["status"] = "testing"
+                    hyp["confidence"] = "pattern_candidate"
+                    hyp["decision"] = "monitor_closely"
+                    self.logger.info(f"   ✅ {hyp_id}: SUPPORTED (pattern candidate)")
+
+                elif classification == "strongly_supported":
+                    hyp["status"] = "testing"
+                    hyp["confidence"] = "strongly_supported"
+                    hyp["decision"] = "ready_for_alerts"
+                    self.logger.info(f"   🟢 {hyp_id}: STRONGLY SUPPORTED (ready)")
+
+                elif classification == "insufficient_data":
+                    hyp["status"] = "awaiting_validation"  # Keep awaiting
+                    hyp["confidence"] = "repeated_observation"
+                    hyp["decision"] = "awaiting_more_data"
+                    self.logger.info(f"   ⏳ {hyp_id}: INSUFFICIENT DATA (need more observations)")
+
+                break
+
+        # Save updated registry
+        self.research._save_hypothesis_registry(registry)
 
     def weekly_loop(self):
         """Ejecuta domingo 20:00 UTC: research review + hypothesis management"""

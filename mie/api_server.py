@@ -291,6 +291,74 @@ class EventsAPI:
             return APIResponse(success=False, error=str(e))
 
 
+class ResearchQualityAPI:
+    """Research quality gate and challenges endpoints."""
+
+    def __init__(self, quality_gate):
+        self.quality_gate = quality_gate
+
+    def get_quality_metrics(self) -> APIResponse:
+        """GET /api/research/quality - Quality metrics."""
+        try:
+            metrics = self.quality_gate.get_quality_metrics()
+            return APIResponse(success=True, data=metrics)
+        except Exception as e:
+            return APIResponse(success=False, error=str(e))
+
+    def get_research_challenges(self, status: str = "open") -> APIResponse:
+        """GET /api/research/challenges - Get research challenges."""
+        try:
+            from pathlib import Path
+            import json
+
+            challenges_path = Path(self.quality_gate.base_dir) / "research_challenges.jsonl"
+            challenges = []
+
+            if challenges_path.exists():
+                with open(challenges_path, "r") as f:
+                    for line in f:
+                        if line.strip():
+                            challenge = json.loads(line)
+                            if status == "all" or challenge.get("status") == status:
+                                challenges.append(challenge)
+
+            return APIResponse(
+                success=True,
+                data={
+                    "count": len(challenges),
+                    "challenges": challenges
+                }
+            )
+        except Exception as e:
+            return APIResponse(success=False, error=str(e))
+
+    def get_invalid_experiments(self) -> APIResponse:
+        """GET /api/research/invalid - Get archived invalid experiments."""
+        try:
+            from pathlib import Path
+            import json
+
+            invalid_path = Path(self.quality_gate.base_dir) / "invalid_experiments.jsonl"
+            experiments = []
+
+            if invalid_path.exists():
+                with open(invalid_path, "r") as f:
+                    for line in f:
+                        if line.strip():
+                            exp = json.loads(line)
+                            experiments.append(exp)
+
+            return APIResponse(
+                success=True,
+                data={
+                    "count": len(experiments),
+                    "experiments": experiments
+                }
+            )
+        except Exception as e:
+            return APIResponse(success=False, error=str(e))
+
+
 class APIServer:
     """Unified API server interface."""
 
@@ -311,6 +379,7 @@ class APIServer:
         )
         self.config = ConfigurationAPI(orchestrator.config)
         self.events = EventsAPI(orchestrator.event_bus)
+        self.research_quality = ResearchQualityAPI(orchestrator.quality_gate)
 
     def get_api_status(self) -> APIResponse:
         """GET /api/status - API status."""
@@ -333,7 +402,10 @@ class APIServer:
                         "GET /api/config/constraints",
                         "PUT /api/config/constraints/{name}",
                         "GET /api/events",
-                        "GET /api/events/stats"
+                        "GET /api/events/stats",
+                        "GET /api/research/quality",
+                        "GET /api/research/challenges",
+                        "GET /api/research/invalid"
                     ]
                 }
             )
